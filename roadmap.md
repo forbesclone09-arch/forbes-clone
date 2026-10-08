@@ -1,0 +1,5 @@
+- [x] Match the reference's dark masthead and account button with an account side panel.
+- [x] Add homepage category story sections using existing mock articles.
+- [x] Verify desktop and mobile appearance and interactions.
+- [x] Create reference-style category mosaics and supplement mock stories and photos.
+- [x] Verify category mosaic layout, images, and article navigation.
