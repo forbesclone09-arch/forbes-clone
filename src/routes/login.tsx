@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 
 import { siteName } from "@/data/content";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
   staticData: { sitemap: false },
@@ -26,9 +27,29 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const navigate = useNavigate({ from: Route.fullPath });
   const [attempted, setAttempted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAttempted(true);
+    setError("");
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      setError(error.message);
+      setAttempted(false);
+    } else {
+      navigate({ to: "/dashboard" });
+    }
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col px-5 pb-4 sm:px-8">
@@ -53,10 +74,7 @@ function LoginPage() {
         </p>
 
         <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setAttempted(true);
-          }}
+          onSubmit={handleLogin}
           className="mt-9 space-y-5"
         >
           <label className="block">
@@ -99,18 +117,15 @@ function LoginPage() {
           <button
             type="submit"
             className="w-full bg-foreground px-6 py-3.5 text-[0.82rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
+            disabled={attempted}
           >
-            Sign in
+            {attempted ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        {attempted && (
-          <p className="mt-3 text-[0.85rem]"><Link to="/dashboard" className="font-semibold underline underline-offset-4 hover:text-brand">Continue to the author dashboard</Link></p>
-        )}
-        {attempted && (
-          <p className="mt-5 border-l-2 border-brand py-1 pl-4 text-[0.85rem] leading-relaxed text-ink-soft">
-            This is a front-end demonstration — no account system is connected, so the credentials
-            above were not checked against anything.
+        {error && (
+          <p className="mt-5 border-l-2 border-red-500 py-1 pl-4 text-[0.85rem] leading-relaxed text-red-500">
+            {error}
           </p>
         )}
 

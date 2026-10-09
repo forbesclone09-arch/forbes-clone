@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState, useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Bold,
   Eye,
@@ -15,7 +15,8 @@ import {
   Quote,
 } from "lucide-react";
 
-import { allArticles, navCategories, siteName, type CategoryName } from "@/data/content";
+import { navCategories, siteName, type CategoryName } from "@/data/content";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/dashboard")({
   staticData: { sitemap: false },
@@ -24,13 +25,6 @@ export const Route = createFileRoute("/dashboard")({
       { title: `Author dashboard — ${siteName}` },
       { name: "robots", content: "noindex" },
       { name: "description", content: "Manage your stories, drafts and readership in one place." },
-      { property: "og:title", content: `Author dashboard — ${siteName}` },
-      {
-        property: "og:description",
-        content: "Manage your stories, drafts and readership in one place.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DashboardPage,
@@ -38,36 +32,97 @@ export const Route = createFileRoute("/dashboard")({
 
 type Status = "Published" | "In review" | "Draft";
 const statuses: Status[] = ["Published", "In review", "Draft"];
-const viewCounts = [48210, 31904, 22785, 18320, 15102, 9870, 7340, 5120, 2980, 1410, 860];
 
 function DashboardPage() {
+  const navigate = useNavigate({ from: Route.fullPath });
+  const [session, setSession] = useState<any>(null);
+  const [role, setRole] = useState<string>("user");
+  const [articles, setArticles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate({ to: "/login" });
+      } else {
+        setSession(session);
+        fetchData(session.user.id);
+      }
+    });
+  }, [navigate]);
+
+  const fetchData = async (userId: string) => {
+    // Fetch role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+    
+    const userRole = roleData?.role || "user";
+    setRole(userRole);
+
+    // Fetch articles
+    let query = supabase.from("articles").select("*").order("created_at", { ascending: false });
+    
+    // If not admin, maybe restrict to their own (for now, we'll just show all since auth isn't fully linking articles to authors yet)
+    const { data: articlesData } = await query;
+    if (articlesData) {
+      const mapped = articlesData.map((row: any) => ({
+        slug: row.slug,
+        title: row.title,
+        deck: row.excerpt,
+        category: row.category,
+        author: { name: row.author, title: "Staff Writer" },
+        published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+        readTime: parseInt(row.read_time) || 5,
+        image: row.image_url,
+      }));
+      setArticles(mapped);
+    }
+    setLoading(false);
+  };
+
   const rows = useMemo(
     () =>
-      allArticles.map((article, i) => ({
+      articles.map((article, i) => ({
         article,
-        status: (i < 7 ? "Published" : statuses[i % 3]) as Status,
-        views: i < 7 ? (viewCounts[i] ?? 0) : 0,
+        status: (i < 2 ? "Published" : statuses[i % 3]) as Status,
+        views: i < 5 ? Math.floor(Math.random() * 50000) : 0,
       })),
-    [],
+    [articles],
   );
   const [filter, setFilter] = useState<"All" | Status>("All");
   const [tab, setTab] = useState<"stories" | "editor">("stories");
   const visible = rows.filter((r) => filter === "All" || r.status === filter);
   const totalViews = rows.reduce((s, r) => s + r.views, 0);
 
+  if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
+
   return (
     <div className="mx-auto w-full max-w-[1240px] px-5 py-10 sm:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground pb-5">
         <div>
-          <p className="kicker">Author dashboard</p>
-          <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem]">Good morning, Nadia</h1>
+          <p className="kicker">Author dashboard {role === 'admin' && <span className="text-brand ml-2">(Admin Access)</span>}</p>
+          <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem]">Welcome back, {session?.user?.email}</h1>
         </div>
-        <button
-          onClick={() => setTab("editor")}
-          className="inline-flex items-center gap-2 bg-foreground px-5 py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
-        >
-          <Plus className="h-4 w-4" /> New story
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/login" });
+            }}
+            className="text-[0.78rem] font-semibold tracking-[0.08em] text-ink-soft hover:text-foreground uppercase"
+          >
+            Sign out
+          </button>
+          <button
+            onClick={() => setTab("editor")}
+            className="inline-flex items-center gap-2 bg-foreground px-5 py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
+          >
+            <Plus className="h-4 w-4" /> New story
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 border-b border-rule lg:grid-cols-4">
