@@ -4,7 +4,8 @@ import { ArticleCard, SectionHeading } from "@/components/article-card";
 import { CategoryMosaic } from "@/components/category-mosaic";
 import { FeaturedHero } from "@/components/featured-hero";
 import { MostRead } from "@/components/most-read";
-import { recentArticles, siteName } from "@/data/content";
+import { siteName, Article, CategoryName } from "@/data/content";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -26,10 +27,34 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  loader: async () => {
+    const { data, error } = await supabase
+      .from("articles")
+      .select("*")
+      .order("published_at", { ascending: false })
+      .limit(6);
+    
+    if (error || !data) return { articles: [] as Article[] };
+
+    const mappedArticles: Article[] = data.map((row: any) => ({
+      slug: row.slug,
+      title: row.title,
+      deck: row.excerpt,
+      category: row.category as CategoryName,
+      author: { name: row.author, title: "Staff Writer" },
+      published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      readTime: parseInt(row.read_time) || 5,
+      image: row.image_url,
+    }));
+
+    return { articles: mappedArticles };
+  },
   component: HomePage,
 });
 
 function HomePage() {
+  const { articles } = Route.useLoaderData();
+
   return (
     <>
       <FeaturedHero />
@@ -38,9 +63,9 @@ function HomePage() {
         <section aria-label="Recent news" className="mt-16">
         <div className="grid gap-x-10 gap-y-12 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <SectionHeading title="Recent News" kicker="Updated hourly" />
+            <SectionHeading title="Recent News" kicker="Live from Supabase" />
             <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2">
-              {recentArticles.map((article) => (
+              {articles.map((article) => (
                 <ArticleCard key={article.slug} article={article} />
               ))}
             </div>
