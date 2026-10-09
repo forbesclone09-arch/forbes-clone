@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
 
 import {
   AuthField,
@@ -25,6 +26,28 @@ function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDone(true);
+    setError("");
+
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        }
+      }
+    });
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setDone(false);
+    }
+  };
 
   return (
     <AuthShell
@@ -32,10 +55,7 @@ function SignupPage() {
       intro="Contributors draft, edit and track their stories from one dashboard."
     >
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setDone(true);
-        }}
+        onSubmit={handleSignup}
         className="mt-9 space-y-5"
       >
         <AuthField label="Full name" value={name} onChange={setName} placeholder="Nadia Rahman" />
@@ -54,12 +74,16 @@ function SignupPage() {
           minLength={8}
           placeholder="At least 8 characters"
         />
-        <AuthSubmit>Create account</AuthSubmit>
+        <AuthSubmit disabled={done}>{done ? "Signing up..." : "Create account"}</AuthSubmit>
       </form>
-      {done && (
+      {error && (
         <AuthNotice>
-          Demo only — no account was created. In the live product you'd now receive a confirmation
-          email. <Link to="/dashboard" className={authLinkClass}>Preview the author dashboard</Link>.
+          <span className="text-red-500">{error}</span>
+        </AuthNotice>
+      )}
+      {done && !error && (
+        <AuthNotice>
+          Account created! Check your email to confirm, or if email confirmation is disabled in Supabase, you can now <Link to="/login" className={authLinkClass}>Sign in</Link>.
         </AuthNotice>
       )}
       <div className="mt-9 border-t border-rule pt-6 text-[0.88rem] text-ink-soft">
