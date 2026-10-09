@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { ArrowRight, Bell, ChevronDown, Menu, Search, Settings2, X } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Bell, ChevronDown, Menu, Search, Settings2, X, LayoutDashboard, LogOut } from "lucide-react";
 
 import { allArticles, briefingItems, featuredArticle, mostRead, navCategories, recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 function Wordmark() {
   return (
@@ -26,11 +27,25 @@ function Wordmark() {
 }
 
 export function SiteHeader() {
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountTab, setAccountTab] = useState<"account" | "notifications" | "settings">("account");
   const [accountSection, setAccountSection] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!menuOpen && !accountOpen) return;
@@ -49,6 +64,12 @@ export function SiteHeader() {
   const closeMenu = () => {
     setMenuOpen(false);
     setSearch("");
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setAccountOpen(false);
+    navigate({ to: "/" });
   };
 
   const query = search.trim().toLowerCase();
@@ -120,10 +141,11 @@ export function SiteHeader() {
           <div className="justify-self-center text-background [&_a]:gap-0 [&_span:first-child]:hidden [&_span:last-child]:text-[1.85rem] sm:[&_span:last-child]:text-[2.1rem]"><Wordmark /></div>
 
           <div className="flex items-center gap-2 justify-self-end sm:gap-5">
-            <Link to="/signup" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Sign up</Link>
-            <Link to="/contact" onClick={() => setAccountOpen(false)} className="hidden bg-brand px-4 py-2.5 text-[0.78rem] font-semibold text-brand-foreground hover:bg-brand/85 sm:inline-flex">Subscribe</Link>
+            {!session && <Link to="/signup" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Sign up</Link>}
+            {!session && <Link to="/contact" onClick={() => setAccountOpen(false)} className="hidden bg-brand px-4 py-2.5 text-[0.78rem] font-semibold text-brand-foreground hover:bg-brand/85 sm:inline-flex">Subscribe</Link>}
+            {session && <Link to="/dashboard" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Dashboard</Link>}
             <Button type="button" variant="ghost" onClick={() => { closeMenu(); setAccountOpen((open) => !open); }} aria-expanded={accountOpen} aria-controls="account-panel" aria-label="Open account panel" className="h-9 gap-2 rounded-full border border-background/20 bg-background/10 px-2 text-background hover:bg-background/20 hover:text-background">
-              <span className="grid size-6 place-items-center rounded-full bg-foreground font-display text-base font-semibold text-background ring-1 ring-background/40">M</span><ChevronDown className="size-3" aria-hidden="true" />
+              <span className="grid size-6 place-items-center rounded-full bg-foreground font-display text-base font-semibold text-background ring-1 ring-background/40">{session ? session.user.email?.[0].toUpperCase() : 'M'}</span><ChevronDown className="size-3" aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -167,7 +189,7 @@ export function SiteHeader() {
                 <Link to="/about" onClick={closeMenu} className="hover:text-brand">About Us</Link>
                 <Link to="/contact" onClick={closeMenu} className="hover:text-brand">Contact</Link>
                 <Link to="/privacy" onClick={closeMenu} className="hover:text-brand">Privacy Policy</Link>
-                <Link to="/signup" onClick={closeMenu} className="hover:text-brand">Sign up</Link>
+                {!session && <Link to="/signup" onClick={closeMenu} className="hover:text-brand">Sign up</Link>}
               </div>
             </div>
 
@@ -235,19 +257,40 @@ export function SiteHeader() {
             </div>
             {accountTab === "account" ? (
               <div className="pt-2">
-                {(["For You", "Newsletters", "Reading List"] as const).map((section) => (
-                  <div key={section} className="border-b border-background/20">
-                    <Button variant="ghost" type="button" aria-expanded={accountSection === section} onClick={() => setAccountSection(accountSection === section ? null : section)} className="flex h-[72px] w-full justify-between rounded-none px-0 text-left text-sm font-semibold text-background hover:bg-transparent hover:text-background">{section}<ChevronDown className={`size-4 transition-transform ${accountSection === section ? "rotate-180" : ""}`} /></Button>
-                    {accountSection === section && <p className="pb-5 text-sm leading-relaxed text-background/65">{section === "For You" ? "Your personalized stories will appear here when you sign in." : section === "Newsletters" ? "Sign in to see the newsletters you follow." : "Sign in to see your saved stories."}</p>}
-                  </div>
-                ))}
-                <p className="mt-7 text-sm text-background/90">Already have an account? <Link to="/login" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Sign In</Link></p>
-                <p className="mt-2 text-sm text-background/90">New contributor? <Link to="/signup" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Create an account</Link></p>
+                {session ? (
+                  <>
+                    <p className="mb-4 pt-4 text-sm font-semibold text-background/90">{session.user.email}</p>
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setAccountOpen(false)}
+                      className="group flex items-center gap-3 border-b border-background/20 py-4 text-sm font-semibold text-background hover:text-brand"
+                    >
+                      <LayoutDashboard className="size-4" /> Go to Dashboard
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="group flex w-full items-center gap-3 border-b border-background/20 py-4 text-left text-sm font-semibold text-background hover:text-brand"
+                    >
+                      <LogOut className="size-4" /> Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {(["For You", "Newsletters", "Reading List"] as const).map((section) => (
+                      <div key={section} className="border-b border-background/20">
+                        <Button variant="ghost" type="button" aria-expanded={accountSection === section} onClick={() => setAccountSection(accountSection === section ? null : section)} className="flex h-[72px] w-full justify-between rounded-none px-0 text-left text-sm font-semibold text-background hover:bg-transparent hover:text-background">{section}<ChevronDown className={`size-4 transition-transform ${accountSection === section ? "rotate-180" : ""}`} /></Button>
+                        {accountSection === section && <p className="pb-5 text-sm leading-relaxed text-background/65">{section === "For You" ? "Your personalized stories will appear here when you sign in." : section === "Newsletters" ? "Sign in to see the newsletters you follow." : "Sign in to see your saved stories."}</p>}
+                      </div>
+                    ))}
+                    <p className="mt-7 text-sm text-background/90">Already have an account? <Link to="/login" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Sign In</Link></p>
+                    <p className="mt-2 text-sm text-background/90">New contributor? <Link to="/signup" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Create an account</Link></p>
+                  </>
+                )}
               </div>
             ) : accountTab === "notifications" ? (
-              <div className="pt-9"><Bell className="size-5 text-background/70" aria-hidden="true" /><h2 className="mt-4 text-base font-semibold">Notifications</h2><p className="mt-2 text-sm leading-relaxed text-background/65">Sign in to see your notifications.</p><Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link></div>
+              <div className="pt-9"><Bell className="size-5 text-background/70" aria-hidden="true" /><h2 className="mt-4 text-base font-semibold">Notifications</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "You have no new notifications." : "Sign in to see your notifications."}</p>{!session && <Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link>}</div>
             ) : (
-              <div className="pt-9"><h2 className="text-base font-semibold">Account settings</h2><p className="mt-2 text-sm leading-relaxed text-background/65">Sign in to manage your account preferences.</p><Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link></div>
+              <div className="pt-9"><h2 className="text-base font-semibold">Account settings</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "Manage your account preferences here." : "Sign in to manage your account preferences."}</p>{!session && <Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link>}</div>
             )}
           </aside>
         </>
