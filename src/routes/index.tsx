@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ArticleCard, SectionHeading } from "@/components/article-card";
-import { CategoryMosaic } from "@/components/category-mosaic";
 import { FeaturedHero } from "@/components/featured-hero";
-import { MostRead } from "@/components/most-read";
 import { siteName, Article, CategoryName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
 
@@ -31,8 +29,8 @@ export const Route = createFileRoute("/")({
     const { data, error } = await supabase
       .from("articles")
       .select("*")
-      .order("published_at", { ascending: false })
-      .limit(6);
+      .order("created_at", { ascending: false })
+      .limit(10);
     
     if (error || !data) return { articles: [] as Article[] };
 
@@ -54,30 +52,26 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { articles } = Route.useLoaderData();
+  const featured = articles[0];
+  const recent = articles.slice(1);
 
   return (
     <>
-      <FeaturedHero />
+      {featured && <FeaturedHero article={featured} />}
 
       <div className="mx-auto w-full max-w-[1240px] px-5 pb-4 sm:px-8">
         <section aria-label="Recent news" className="mt-16">
         <div className="grid gap-x-10 gap-y-12 lg:grid-cols-12">
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-12">
             <SectionHeading title="Recent News" kicker="Live from Supabase" />
-            <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2">
-              {articles.map((article) => (
+            <div className="grid gap-x-8 gap-y-12 sm:grid-cols-3">
+              {recent.map((article) => (
                 <ArticleCard key={article.slug} article={article} />
               ))}
             </div>
           </div>
-
-          <div className="lg:col-span-4">
-            <MostRead />
-          </div>
         </div>
       </section>
-        <CategoryMosaic category="Business" />
-        <CategoryMosaic category="Tech" />
       </div>
     </>
   );

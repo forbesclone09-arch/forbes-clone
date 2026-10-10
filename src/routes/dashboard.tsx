@@ -77,6 +77,7 @@ function DashboardPage() {
         published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
         readTime: parseInt(row.read_time) || 5,
         image: row.image_url,
+        body: row.body,
       }));
       setArticles(mapped);
     }

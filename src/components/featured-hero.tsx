@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Clock } from "lucide-react";
 
-import { featuredArticle } from "@/data/content";
+import { Article } from "@/data/content";
 
 // Full-bleed cover hero: edge-to-edge photo with the story text overlaid
 // on a bottom gradient, like a magazine cover.
-export function FeaturedHero() {
-  const article = featuredArticle;
+export function FeaturedHero({ article }: { article: Article }) {
+  if (!article) return null;
 
   return (
     <section
