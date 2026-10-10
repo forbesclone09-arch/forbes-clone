@@ -78,6 +78,7 @@ function DashboardPage() {
         readTime: parseInt(row.read_time) || 5,
         image: row.image_url,
         body: row.body,
+        views: row.views || 0,
       }));
       setArticles(mapped);
     }
@@ -89,7 +90,7 @@ function DashboardPage() {
       articles.map((article, i) => ({
         article,
         status: (i < 2 ? "Published" : statuses[i % 3]) as Status,
-        views: i < 5 ? Math.floor(Math.random() * 50000) : 0,
+        views: article.views,
       })),
     [articles],
   );
@@ -237,11 +238,17 @@ function DashboardPage() {
 }
 
 function AuthorsManager() {
-  const mockAuthors = [
-    { id: 1, name: "Alex Weber", email: "alex@example.com", role: "Author", status: "Active" },
-    { id: 2, name: "Sarah Chen", email: "sarah@example.com", role: "Author", status: "Active" },
-    { id: 3, name: "Michael Foster", email: "michael@example.com", role: "Author", status: "Inactive" },
-  ];
+  const [authors, setAuthors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from('user_roles').select('*').then(({ data }) => {
+      setAuthors(data || []);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div className="mt-6 p-4">Loading authors...</div>;
 
   return (
     <section className="mt-6">
@@ -255,24 +262,18 @@ function AuthorsManager() {
         <table className="w-full text-left text-[0.9rem]">
           <thead className="bg-secondary/50 border-b border-rule">
             <tr>
-              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Name</th>
-              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Email</th>
-              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Status</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Role</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">ID</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
-            {mockAuthors.map((author) => (
+            {authors.map((author) => (
               <tr key={author.id} className="hover:bg-secondary/20">
-                <td className="py-4 px-4 font-semibold text-foreground">{author.name}</td>
-                <td className="py-4 px-4 text-ink-soft">{author.email}</td>
-                <td className="py-4 px-4">
-                  <span className={`px-2 py-1 text-[0.75rem] font-semibold border ${author.status === 'Active' ? 'border-brand text-brand' : 'border-ink-soft text-ink-soft'}`}>
-                    {author.status}
-                  </span>
-                </td>
+                <td className="py-4 px-4 font-semibold text-foreground uppercase">{author.role}</td>
+                <td className="py-4 px-4 text-ink-soft">{author.user_id}</td>
                 <td className="py-4 px-4 text-right">
-                  <button className="text-[0.8rem] font-semibold hover:text-brand mr-4">Edit Details</button>
+                  <button className="text-[0.8rem] font-semibold hover:text-brand mr-4 text-ink-soft">Edit Details</button>
                   <button className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700">Remove</button>
                 </td>
               </tr>
@@ -281,7 +282,7 @@ function AuthorsManager() {
         </table>
       </div>
       <p className="mt-4 text-[0.8rem] text-ink-soft">
-        Note: Supabase requires Admin API access or server-side edge functions to securely reset user passwords or delete authentication accounts. This UI is a visual mock for the frontend.
+        Note: Supabase requires Admin API access or server-side edge functions to securely reset user passwords or delete authentication accounts.
       </p>
     </section>
   );
@@ -290,7 +291,7 @@ function AuthorsManager() {
 function Editor({ initialArticle, onClose, session }: { initialArticle: any, onClose: () => void, session: any }) {
   const [title, setTitle] = useState(initialArticle?.title || "");
   const [excerpt, setExcerpt] = useState(initialArticle?.deck || "");
-  const [category, setCategory] = useState<CategoryName>(initialArticle?.category || "Business");
+  const [category, setCategory] = useState(initialArticle?.category || "Business");
   // Handle content body. Store as simple text for MVP, parse back into JSON array on save.
   const initialBodyText = initialArticle?.body 
     ? initialArticle.body.map((b: any) => b.content).join("\n\n") 
@@ -314,7 +315,7 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
       image_alt: "Article Image",
       author: session?.user?.email?.split('@')[0] || "Unknown",
       read_time: "5 min read",
-      published_at: new Date().toISOString(),
+      published_at: initialArticle?.published_at || new Date().toISOString(),
       is_premium: false
     };
 
@@ -358,7 +359,7 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Start writing your story... (separate paragraphs by pressing Enter twice)"
+          placeholder="Start writing your story... (separate paragraphs by pressing Enter twice) Supports HTML."
           className="min-h-[360px] w-full resize-y border border-t-0 border-rule bg-transparent p-5 text-[1.02rem] leading-relaxed outline-none focus:border-foreground"
         />
       </div>
@@ -368,15 +369,18 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
           <p className="kicker">Publishing</p>
           <label className="mt-4 block text-[0.8rem] font-semibold">
             Category
-            <select
+            <input
+              list="categories-list"
               value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryName)}
+              onChange={(e) => setCategory(e.target.value)}
               className="mt-2 w-full border border-rule bg-background px-3 py-2.5 font-normal outline-none"
-            >
+              placeholder="Select or type..."
+            />
+            <datalist id="categories-list">
               {navCategories.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c} value={c} />
               ))}
-            </select>
+            </datalist>
           </label>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button

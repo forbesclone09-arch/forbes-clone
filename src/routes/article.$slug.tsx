@@ -139,7 +139,13 @@ function ArticlePage() {
           <div className="mt-6 space-y-6">
             {bodyBlocks.map((block: any, idx: number) => {
               if (block.type === 'paragraph') {
-                return <p key={idx} className="text-[1.05rem] leading-[1.75] text-foreground/90">{block.content}</p>;
+                return (
+                  <p 
+                    key={idx} 
+                    className="text-[1.05rem] leading-[1.75] text-foreground/90"
+                    dangerouslySetInnerHTML={{ __html: block.content }}
+                  />
+                );
               }
               return null;
             })}
