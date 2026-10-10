@@ -96,6 +96,9 @@ function DashboardPage() {
   const [tab, setTab] = useState<"stories" | "editor" | "authors">("stories");
   const [activeArticle, setActiveArticle] = useState<any>(null);
 
+  const visible = rows.filter((r) => filter === "All" || r.status === filter);
+  const totalViews = rows.reduce((s, r) => s + r.views, 0);
+
   const openEditor = (article: any = null) => {
     setActiveArticle(article);
     setTab("editor");
