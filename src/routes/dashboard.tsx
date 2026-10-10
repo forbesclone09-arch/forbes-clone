@@ -93,9 +93,18 @@ function DashboardPage() {
     [articles],
   );
   const [filter, setFilter] = useState<"All" | Status>("All");
-  const [tab, setTab] = useState<"stories" | "editor">("stories");
-  const visible = rows.filter((r) => filter === "All" || r.status === filter);
-  const totalViews = rows.reduce((s, r) => s + r.views, 0);
+  const [activeArticle, setActiveArticle] = useState<any>(null);
+
+  const openEditor = (article: any = null) => {
+    setActiveArticle(article);
+    setTab("editor");
+  };
+
+  const handleEditorClose = () => {
+    setTab("stories");
+    setActiveArticle(null);
+    fetchData(session?.user?.id); // Refresh after edit
+  };
 
   if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
 
@@ -117,7 +126,7 @@ function DashboardPage() {
             Sign out
           </button>
           <button
-            onClick={() => setTab("editor")}
+            onClick={() => openEditor()}
             className="inline-flex items-center gap-2 bg-foreground px-5 py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
           >
             <Plus className="h-4 w-4" /> New story
@@ -148,7 +157,7 @@ function DashboardPage() {
         ).map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => key === "stories" ? handleEditorClose() : openEditor(activeArticle)}
             className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold transition-colors ${
               tab === key ? "border-brand text-foreground" : "border-transparent text-ink-soft hover:text-foreground"
             }`}
@@ -201,7 +210,7 @@ function DashboardPage() {
                   <span className="inline-flex w-20 items-center gap-1 text-ink-soft">
                     <Eye className="h-3.5 w-3.5" /> {views ? views.toLocaleString() : "—"}
                   </span>
-                  <button onClick={() => setTab("editor")} className="font-semibold hover:text-brand">
+                  <button onClick={() => openEditor(article)} className="font-semibold hover:text-brand">
                     Edit
                   </button>
                 </div>
@@ -210,17 +219,52 @@ function DashboardPage() {
           </ul>
         </section>
       ) : (
-        <Editor />
+        <Editor initialArticle={activeArticle} onClose={handleEditorClose} session={session} />
       )}
     </div>
   );
 }
 
-function Editor() {
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<CategoryName>("Business");
+function Editor({ initialArticle, onClose, session }: { initialArticle: any, onClose: () => void, session: any }) {
+  const [title, setTitle] = useState(initialArticle?.title || "");
+  const [excerpt, setExcerpt] = useState(initialArticle?.deck || "");
+  const [category, setCategory] = useState<CategoryName>(initialArticle?.category || "Business");
+  // Handle content body. Store as simple text for MVP, parse back into JSON array on save.
+  const initialBodyText = initialArticle?.body 
+    ? initialArticle.body.map((b: any) => b.content).join("\n\n") 
+    : "";
+  const [content, setContent] = useState(initialBodyText);
   const [saved, setSaved] = useState("");
   const tools = [Bold, Italic, Heading2, Quote, List, ListOrdered, Link2, ImagePlus];
+
+  const handleSave = async () => {
+    setSaved("Saving...");
+    const slug = initialArticle?.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const paragraphs = content.split("\n\n").map(p => ({ type: "paragraph", content: p }));
+    
+    const articleData = {
+      slug,
+      title,
+      excerpt,
+      category,
+      body: paragraphs,
+      image_url: initialArticle?.image || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80",
+      image_alt: "Article Image",
+      author: session?.user?.email?.split('@')[0] || "Unknown",
+      read_time: "5 min read",
+      published_at: new Date().toISOString(),
+      is_premium: false
+    };
+
+    const { error } = await supabase.from('articles').upsert(articleData, { onConflict: 'slug' });
+    
+    if (error) {
+      setSaved(`Error: ${error.message}`);
+    } else {
+      setSaved("Successfully saved to Supabase!");
+      setTimeout(() => onClose(), 1500);
+    }
+  };
 
   return (
     <section className="mt-6 grid gap-8 lg:grid-cols-[1fr_300px]">
@@ -232,6 +276,8 @@ function Editor() {
           className="w-full border-b border-rule bg-transparent pb-3 font-display text-[2rem] leading-tight outline-none placeholder:text-ink-soft focus:border-foreground"
         />
         <input
+          value={excerpt}
+          onChange={(e) => setExcerpt(e.target.value)}
           placeholder="Standfirst — one or two sentences that sell the story"
           className="mt-4 w-full bg-transparent text-[1.05rem] text-ink-soft outline-none"
         />
@@ -247,13 +293,12 @@ function Editor() {
             </button>
           ))}
         </div>
-        <div
-          contentEditable
-          suppressContentEditableWarning
-          className="min-h-[360px] border border-t-0 border-rule p-5 text-[1.02rem] leading-relaxed outline-none focus:border-foreground"
-        >
-          Start writing your story…
-        </div>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Start writing your story... (separate paragraphs by pressing Enter twice)"
+          className="min-h-[360px] w-full resize-y border border-t-0 border-rule bg-transparent p-5 text-[1.02rem] leading-relaxed outline-none focus:border-foreground"
+        />
       </div>
 
       <aside className="space-y-6">
@@ -273,19 +318,19 @@ function Editor() {
           </label>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button
-              onClick={() => setSaved("Draft saved locally (demo only).")}
+              onClick={handleSave}
               className="border border-foreground px-3 py-2.5 text-[0.75rem] font-semibold tracking-[0.06em] uppercase hover:bg-secondary"
             >
-              Save draft
+              Save to DB
             </button>
             <button
-              onClick={() => setSaved("Sent to editors for review (demo only).")}
+              onClick={() => onClose()}
               className="bg-foreground px-3 py-2.5 text-[0.75rem] font-semibold tracking-[0.06em] text-background uppercase hover:bg-brand"
             >
-              Submit
+              Cancel
             </button>
           </div>
-          {saved && <p className="mt-3 border-l-2 border-brand pl-3 text-[0.8rem] text-ink-soft">{saved}</p>}
+          {saved && <p className={`mt-3 border-l-2 pl-3 text-[0.8rem] ${saved.includes('Error') ? 'border-red-500 text-red-500' : 'border-brand text-brand'}`}>{saved}</p>}
         </div>
         <div className="border-t border-rule pt-4">
           <p className="kicker">Cover image</p>
@@ -294,14 +339,6 @@ function Editor() {
               <ImagePlus className="h-4 w-4" /> Drop an image
             </span>
           </div>
-        </div>
-        <div className="border-t border-rule pt-4 text-[0.82rem] leading-relaxed text-ink-soft">
-          <p className="kicker text-foreground">Desk guidelines</p>
-          <ul className="mt-3 list-disc space-y-1.5 pl-4">
-            <li>Headlines under 90 characters.</li>
-            <li>Attribute every figure to a source.</li>
-            <li>Captions credit the photographer.</li>
-          </ul>
         </div>
       </aside>
     </section>

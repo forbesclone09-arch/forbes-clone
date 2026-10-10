@@ -1,16 +1,35 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { ArticleCard, SectionHeading } from "@/components/article-card";
-import { articlesByCategory, navCategories, siteName, type CategoryName } from "@/data/content";
+import { navCategories, siteName, type CategoryName, type Article } from "@/data/content";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/category/$category")({
   staticData: { sitemap: true },
-  loader: ({ params }) => {
+  loader: async ({ params }) => {
     const match = navCategories.find(
       (category) => category.toLowerCase() === params.category.toLowerCase(),
     );
     if (!match) throw notFound();
-    return { category: match as CategoryName, articles: articlesByCategory(match) };
+
+    const { data: rows } = await supabase
+      .from("articles")
+      .select("*")
+      .ilike("category", match)
+      .order("created_at", { ascending: false });
+
+    const articles: Article[] = (rows || []).map((row: any) => ({
+      slug: row.slug,
+      title: row.title,
+      deck: row.excerpt,
+      category: row.category as CategoryName,
+      author: { name: row.author, title: "Staff Writer" },
+      published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      readTime: parseInt(row.read_time) || 5,
+      image: row.image_url,
+    }));
+
+    return { category: match as CategoryName, articles };
   },
   head: ({ loaderData }) => {
     const category = loaderData?.category ?? "Category";
