@@ -93,6 +93,7 @@ function DashboardPage() {
     [articles],
   );
   const [filter, setFilter] = useState<"All" | Status>("All");
+  const [tab, setTab] = useState<"stories" | "editor" | "authors">("stories");
   const [activeArticle, setActiveArticle] = useState<any>(null);
 
   const openEditor = (article: any = null) => {
@@ -107,6 +108,15 @@ function DashboardPage() {
   };
 
   if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
+
+  const dashboardTabs: any[] = [
+    ["stories", "My stories", FileText],
+    ["editor", "Editor", PenLine],
+  ];
+  if (role === "admin") {
+    // We import Users icon down below or we can just use another icon, wait we didn't import Users
+    dashboardTabs.push(["authors", "Authors", List]); 
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1240px] px-5 py-10 sm:px-8">
@@ -149,15 +159,10 @@ function DashboardPage() {
       </div>
 
       <div className="mt-8 flex gap-6 border-b border-rule">
-        {(
-          [
-            ["stories", "My stories", FileText],
-            ["editor", "Editor", PenLine],
-          ] as const
-        ).map(([key, label, Icon]) => (
+        {dashboardTabs.map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => key === "stories" ? handleEditorClose() : openEditor(activeArticle)}
+            onClick={() => key === "stories" ? handleEditorClose() : setTab(key)}
             className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold transition-colors ${
               tab === key ? "border-brand text-foreground" : "border-transparent text-ink-soft hover:text-foreground"
             }`}
@@ -218,10 +223,63 @@ function DashboardPage() {
             ))}
           </ul>
         </section>
-      ) : (
+      ) : tab === "editor" ? (
         <Editor initialArticle={activeArticle} onClose={handleEditorClose} session={session} />
+      ) : (
+        <AuthorsManager />
       )}
     </div>
+  );
+}
+
+function AuthorsManager() {
+  const mockAuthors = [
+    { id: 1, name: "Alex Weber", email: "alex@example.com", role: "Author", status: "Active" },
+    { id: 2, name: "Sarah Chen", email: "sarah@example.com", role: "Author", status: "Active" },
+    { id: 3, name: "Michael Foster", email: "michael@example.com", role: "Author", status: "Inactive" },
+  ];
+
+  return (
+    <section className="mt-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="headline text-[1.8rem]">Manage Authors</h2>
+        <button className="bg-foreground text-background px-4 py-2 text-[0.8rem] font-semibold uppercase hover:bg-brand">
+          + Add Author
+        </button>
+      </div>
+      <div className="border border-rule">
+        <table className="w-full text-left text-[0.9rem]">
+          <thead className="bg-secondary/50 border-b border-rule">
+            <tr>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Name</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Email</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Status</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem] text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-rule">
+            {mockAuthors.map((author) => (
+              <tr key={author.id} className="hover:bg-secondary/20">
+                <td className="py-4 px-4 font-semibold text-foreground">{author.name}</td>
+                <td className="py-4 px-4 text-ink-soft">{author.email}</td>
+                <td className="py-4 px-4">
+                  <span className={`px-2 py-1 text-[0.75rem] font-semibold border ${author.status === 'Active' ? 'border-brand text-brand' : 'border-ink-soft text-ink-soft'}`}>
+                    {author.status}
+                  </span>
+                </td>
+                <td className="py-4 px-4 text-right">
+                  <button className="text-[0.8rem] font-semibold hover:text-brand mr-4">Edit Details</button>
+                  <button className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700">Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 text-[0.8rem] text-ink-soft">
+        Note: Supabase requires Admin API access or server-side edge functions to securely reset user passwords or delete authentication accounts. This UI is a visual mock for the frontend.
+      </p>
+    </section>
   );
 }
 
