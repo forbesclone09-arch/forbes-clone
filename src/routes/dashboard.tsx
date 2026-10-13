@@ -329,6 +329,28 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
     }
   };
 
+  const [categories, setCategories] = useState<string[]>(() => {
+    const defaultCats = [...navCategories];
+    if (initialArticle?.category && !defaultCats.includes(initialArticle.category)) {
+      defaultCats.push(initialArticle.category);
+    }
+    return defaultCats;
+  });
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const handleCreateCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    if (!categories.includes(trimmed)) {
+      setCategories((prev) => [...prev, trimmed]);
+    }
+    setCategory(trimmed);
+    setNewCategoryName("");
+    setShowCategoryModal(false);
+  };
+
   return (
     <section className="mt-6 grid gap-8 lg:grid-cols-[1fr_300px]">
       <div>
@@ -369,25 +391,33 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
           <p className="kicker">Publishing</p>
           <label className="mt-4 block text-[0.8rem] font-semibold">
             Category
-            <input
-              list="categories-list"
+            <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__NEW__") {
+                  setShowCategoryModal(true);
+                } else {
+                  setCategory(e.target.value);
+                }
+              }}
               className="mt-2 w-full border border-rule bg-background px-3 py-2.5 font-normal outline-none"
-              placeholder="Select or type..."
-            />
-            <datalist id="categories-list">
-              {navCategories.map((c) => (
-                <option key={c} value={c} />
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
-            </datalist>
+              <option value="__NEW__" className="font-semibold text-brand">
+                + Create a new category...
+              </option>
+            </select>
           </label>
           <div className="mt-5 grid grid-cols-2 gap-2">
             <button
               onClick={handleSave}
               className="border border-foreground px-3 py-2.5 text-[0.75rem] font-semibold tracking-[0.06em] uppercase hover:bg-secondary"
             >
-              Save to DB
+              Save
             </button>
             <button
               onClick={() => onClose()}
@@ -398,6 +428,45 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
           </div>
           {saved && <p className={`mt-3 border-l-2 pl-3 text-[0.8rem] ${saved.includes('Error') ? 'border-red-500 text-red-500' : 'border-brand text-brand'}`}>{saved}</p>}
         </div>
+
+        {/* Modal for creating a new category */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md border border-rule bg-background p-6 shadow-xl">
+              <h3 className="font-display text-[1.4rem] text-foreground">Create New Category</h3>
+              <p className="mt-1 text-[0.85rem] text-ink-soft">Enter the name of the new category you want to add.</p>
+              <form onSubmit={handleCreateCategory} className="mt-4">
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Artificial Intelligence"
+                  className="w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                />
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCategoryModal(false);
+                      setNewCategoryName("");
+                    }}
+                    className="border border-rule px-4 py-2 text-[0.75rem] font-semibold uppercase hover:bg-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-foreground px-4 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand"
+                  >
+                    Save Category
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
         <div className="border-t border-rule pt-4">
           <p className="kicker">Cover image</p>
           <div className="mt-3 grid aspect-[4/3] place-items-center border border-dashed border-rule text-[0.8rem] text-ink-soft">
