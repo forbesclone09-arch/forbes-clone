@@ -13,7 +13,7 @@ import {
 export const Route = createFileRoute("/forgot-password")({
   staticData: { sitemap: false },
   head: () =>
-    authHead("Forgot password", "Request a link to reset your Meridian account password."),
+    authHead("Forgot password", "Request a link to reset your Forbes Germany account password."),
   component: ForgotPasswordPage,
 });
 

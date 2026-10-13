@@ -10,17 +10,14 @@ function Wordmark() {
   return (
     <Link
       to="/"
-      className="group flex min-w-0 items-center gap-2.5"
+      className="group flex min-w-0 items-baseline gap-2"
       aria-label={`${siteName} home`}
     >
-      <span
-        aria-hidden="true"
-        className="grid h-7 w-7 shrink-0 place-items-center bg-foreground font-display text-[1.05rem] leading-none text-background transition-colors group-hover:bg-brand"
-      >
-        M
+      <span className="font-display text-[1.85rem] sm:text-[2.25rem] font-bold tracking-[-0.03em] leading-none text-background group-hover:text-background/90 transition-colors">
+        Forbes
       </span>
-      <span className="truncate font-display text-[1.45rem] leading-none font-semibold tracking-tight">
-        {siteName}
+      <span className="font-sans text-[0.68rem] sm:text-[0.75rem] font-bold tracking-[0.24em] uppercase text-brand">
+        Germany
       </span>
     </Link>
   );
@@ -138,14 +135,14 @@ export function SiteHeader() {
             ))}
           </nav>
           </div>
-          <div className="justify-self-center text-background [&_a]:gap-0 [&_span:first-child]:hidden [&_span:last-child]:text-[1.85rem] sm:[&_span:last-child]:text-[2.1rem]"><Wordmark /></div>
+          <div className="justify-self-center text-background"><Wordmark /></div>
 
           <div className="flex items-center gap-2 justify-self-end sm:gap-5">
             {!session && <Link to="/signup" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Sign up</Link>}
             {!session && <Link to="/contact" onClick={() => setAccountOpen(false)} className="hidden bg-brand px-4 py-2.5 text-[0.78rem] font-semibold text-brand-foreground hover:bg-brand/85 sm:inline-flex">Subscribe</Link>}
             {session && <Link to="/dashboard" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Dashboard</Link>}
             <Button type="button" variant="ghost" onClick={() => { closeMenu(); setAccountOpen((open) => !open); }} aria-expanded={accountOpen} aria-controls="account-panel" aria-label="Open account panel" className="h-9 gap-2 rounded-full border border-background/20 bg-background/10 px-2 text-background hover:bg-background/20 hover:text-background">
-              <span className="grid size-6 place-items-center rounded-full bg-foreground font-display text-base font-semibold text-background ring-1 ring-background/40">{session ? session.user.email?.[0].toUpperCase() : 'M'}</span><ChevronDown className="size-3" aria-hidden="true" />
+              <span className="grid size-6 place-items-center rounded-full bg-foreground font-display text-base font-semibold text-background ring-1 ring-background/40">{session ? session.user.email?.[0].toUpperCase() : 'F'}</span><ChevronDown className="size-3" aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -209,7 +206,7 @@ export function SiteHeader() {
               </nav>
             ) : (
               <div className="grid gap-8 py-7 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
-                <nav aria-label="Explore Meridian" className="grid content-start gap-x-8 gap-y-8 sm:grid-cols-2 xl:grid-cols-3">
+                <nav aria-label={`Explore ${siteName}`} className="grid content-start gap-x-8 gap-y-8 sm:grid-cols-2 xl:grid-cols-3">
                   <section className="min-w-0 border-t border-background/20 pt-5">
                     <h2 className="mb-4 text-base font-semibold">Featured</h2>
                     <div className="space-y-2">

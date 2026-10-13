@@ -48,7 +48,7 @@ const sections = [
   {
     heading: "Your choices",
     body: [
-      "Every email we send carries a one-click unsubscribe link. You can ask us to confirm what we hold about you, correct it, or delete it by writing to privacy@meridian.example. We respond to requests within 30 days.",
+      "Every email we send carries a one-click unsubscribe link. You can ask us to confirm what we hold about you, correct it, or delete it by writing to privacy@forbes.de. We respond to requests within 30 days.",
     ],
   },
   {
@@ -116,7 +116,7 @@ function PrivacyPage() {
           ))}
 
           <p className="pt-8 text-[0.85rem] text-ink-soft">
-            Questions about this policy: privacy@meridian.example
+            Questions about this policy: privacy@forbes.de
           </p>
         </div>
       </div>

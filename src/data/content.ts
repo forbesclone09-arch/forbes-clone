@@ -31,8 +31,8 @@ export interface Article {
   image: string;
 }
 
-export const siteName = "Meridian";
-export const siteTagline = "Business, Technology & the founders building what's next.";
+export const siteName = "Forbes Germany";
+export const siteTagline = "Business, Technology & the leaders building what's next.";
 
 export const navCategories: CategoryName[] = ["Business", "Tech", "Startups"];
 

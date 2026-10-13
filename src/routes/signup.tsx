@@ -16,7 +16,7 @@ export const Route = createFileRoute("/signup")({
   head: () =>
     authHead(
       "Create an author account",
-      "Join the Meridian contributor network to pitch, draft and publish stories.",
+      "Join the Forbes Germany contributor network to pitch, draft and publish stories.",
     ),
   component: SignupPage,
 });

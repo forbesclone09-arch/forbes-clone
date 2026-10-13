@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Reporting and analysis on business, technology and the founders building what's next, from the Meridian newsroom.",
+          `Reporting and analysis on business, technology and the founders building what's next, from the ${siteName} newsroom.`,
       },
       { property: "og:title", content: `${siteName} — Business, Tech & Startups Coverage` },
       {

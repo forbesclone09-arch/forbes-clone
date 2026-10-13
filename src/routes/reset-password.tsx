@@ -12,7 +12,7 @@ import {
 
 export const Route = createFileRoute("/reset-password")({
   staticData: { sitemap: false },
-  head: () => authHead("Choose a new password", "Set a new password for your Meridian account."),
+  head: () => authHead("Choose a new password", "Set a new password for your Forbes Germany account."),
   component: ResetPasswordPage,
 });
 

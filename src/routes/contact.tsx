@@ -28,22 +28,22 @@ export const Route = createFileRoute("/contact")({
 const desks = [
   {
     label: "Story tips",
-    detail: "tips@meridian.example",
+    detail: "tips@forbes.de",
     note: "Encrypted submissions welcome. We do not publish the identity of a source without written consent.",
   },
   {
     label: "Editorial",
-    detail: "editor@meridian.example",
+    detail: "editor@forbes.de",
     note: "Corrections, clarifications and pitches to the features desk.",
   },
   {
     label: "Press & permissions",
-    detail: "permissions@meridian.example",
+    detail: "permissions@forbes.de",
     note: "Reprints, syndication, interview requests and media enquiries.",
   },
   {
     label: "Commercial",
-    detail: "partners@meridian.example",
+    detail: "partners@forbes.de",
     note: "Sponsored content and brand partnerships. Commercial deals never influence coverage.",
   },
 ];
