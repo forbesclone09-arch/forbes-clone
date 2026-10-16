@@ -32,6 +32,11 @@ import {
   UploadCloud,
   Loader2,
   Image as ImageIcon,
+  BookOpen,
+  Globe,
+  Lock,
+  Unlock,
+  Search,
 } from "lucide-react";
 
 import { navCategories, siteName, type CategoryName } from "@/data/content";
@@ -56,10 +61,17 @@ function DashboardPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const [session, setSession] = useState<any>(null);
   const [role, setRole] = useState<string>("user");
+  const [userFullName, setUserFullName] = useState<string>("");
   const [isApproved, setIsApproved] = useState<boolean>(true);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [articles, setArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [tab, setTab] = useState<"all_stories" | "my_stories" | "editor" | "profile" | "authors">("all_stories");
+  const [storyTabMemory, setStoryTabMemory] = useState<"all_stories" | "my_stories">("all_stories");
+  const [filter, setFilter] = useState<"All" | Status>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [activeArticle, setActiveArticle] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -80,9 +92,15 @@ function DashboardPage() {
     // 1. Fetch profile to check role & approval status
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("role, is_approved, full_name")
+      .select("role, is_approved, full_name, email")
       .eq("id", userId)
       .maybeSingle();
+
+    if (profileData?.full_name) {
+      setUserFullName(profileData.full_name);
+    } else if (session?.user?.user_metadata?.full_name) {
+      setUserFullName(session.user.user_metadata.full_name);
+    }
 
     // 2. Fetch role fallback
     const { data: roleData } = await supabase
@@ -91,15 +109,15 @@ function DashboardPage() {
       .eq("user_id", userId)
       .maybeSingle();
     
-    const isAdmin = isSuperAdmin || roleData?.role === "admin" || profileData?.role === "admin";
-    const userRole = isAdmin ? "admin" : (profileData?.role || roleData?.role || "author");
+    const userIsAdmin = isSuperAdmin || roleData?.role === "admin" || profileData?.role === "admin";
+    const userRole = userIsAdmin ? "admin" : (profileData?.role || roleData?.role || "author");
     setRole(userRole);
 
     // Super admin or admin is always approved. Non-admin requires profileData.is_approved === true
-    const approved = isAdmin ? true : (profileData?.is_approved ?? false);
+    const approved = userIsAdmin ? true : (profileData?.is_approved ?? false);
     setIsApproved(approved);
 
-    if (isAdmin) {
+    if (userIsAdmin) {
       const { count } = await supabase
         .from("profiles")
         .select("*", { count: "exact", head: true })
@@ -107,30 +125,78 @@ function DashboardPage() {
       if (count !== null) setPendingCount(count);
     }
 
-    if (!approved && !isAdmin) {
+    if (!approved && !userIsAdmin) {
       setLoading(false);
       return;
     }
 
     // Fetch articles
-    let query = supabase.from("articles").select("*").order("created_at", { ascending: false });
-    const { data: articlesData } = await query;
-    if (articlesData) {
-      const mapped = articlesData.map((row: any) => ({
-        slug: row.slug,
-        title: row.title,
-        deck: row.excerpt,
-        category: row.category,
-        author: { name: row.author, title: "Staff Writer" },
-        published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
-        readTime: parseInt(row.read_time) || 5,
-        image: row.image_url,
-        body: row.body,
-        views: row.views || 0,
-      }));
-      setArticles(mapped);
+    let query = supabase.from("articles").select("*").order("published_at", { ascending: false });
+    const { data: articlesData, error: artError } = await query;
+    if (artError) {
+      const fallback = await supabase.from("articles").select("*");
+      if (fallback.data) {
+        setArticles(mapArticleRows(fallback.data));
+      }
+    } else if (articlesData) {
+      setArticles(mapArticleRows(articlesData));
     }
     setLoading(false);
+  };
+
+  const mapArticleRows = (rows: any[]) => {
+    return rows.map((row: any) => ({
+      slug: row.slug,
+      title: row.title,
+      deck: row.excerpt,
+      category: row.category,
+      author: { name: row.author, title: "Staff Writer" },
+      author_id: row.author_id || null,
+      author_email: row.author_email || null,
+      published: new Date(row.published_at || Date.now()).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      published_at: row.published_at,
+      readTime: parseInt(row.read_time) || 5,
+      image: row.image_url,
+      body: row.body,
+      views: row.views || 0,
+    }));
+  };
+
+  const isAdmin = useMemo(() => {
+    return role === "admin" || session?.user?.email === "forbesclone09@gmail.com";
+  }, [role, session]);
+
+  const isStoryOwner = (article: any) => {
+    if (!session?.user) return false;
+    const userId = session.user.id;
+    const userEmail = (session.user.email || "").trim().toLowerCase();
+    const emailPrefix = userEmail.split("@")[0].toLowerCase();
+    const fullName = (userFullName || "").trim().toLowerCase();
+
+    // 1. Direct author_id match
+    if (article.author_id && article.author_id === userId) return true;
+
+    // 2. Direct author_email match
+    if (article.author_email && article.author_email.trim().toLowerCase() === userEmail) return true;
+
+    // 3. String name or email prefix match
+    const rawAuthor = (
+      typeof article.author === "string" 
+        ? article.author 
+        : article.author?.name || ""
+    ).trim().toLowerCase();
+
+    if (rawAuthor) {
+      if (rawAuthor === userEmail) return true;
+      if (rawAuthor === emailPrefix) return true;
+      if (fullName && rawAuthor === fullName) return true;
+    }
+
+    return false;
+  };
+
+  const canEditStory = (article: any) => {
+    return isAdmin || isStoryOwner(article);
   };
 
   const rows = useMemo(
@@ -139,30 +205,55 @@ function DashboardPage() {
         article,
         status: (i < 2 ? "Published" : statuses[i % 3]) as Status,
         views: article.views,
+        isOwner: isStoryOwner(article),
       })),
-    [articles],
+    [articles, session, userFullName],
   );
-  const [filter, setFilter] = useState<"All" | Status>("All");
-  const [tab, setTab] = useState<"stories" | "editor" | "profile" | "authors">("stories");
-  const [activeArticle, setActiveArticle] = useState<any>(null);
 
-  const visible = rows.filter((r) => filter === "All" || r.status === filter);
+  const myRows = useMemo(
+    () => rows.filter((r) => r.isOwner),
+    [rows],
+  );
+
+  const activeRows = tab === "my_stories" ? myRows : rows;
+
+  const visible = activeRows.filter((r) => {
+    const matchesFilter = filter === "All" || r.status === filter;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      r.article.title.toLowerCase().includes(q) ||
+      r.article.category.toLowerCase().includes(q) ||
+      (r.article.author?.name || "").toLowerCase().includes(q);
+    return matchesFilter && matchesSearch;
+  });
+
   const totalViews = rows.reduce((s, r) => s + r.views, 0);
+  const myTotalViews = myRows.reduce((s, r) => s + r.views, 0);
+  const displayedStats = tab === "my_stories" ? myRows : rows;
+  const displayedViews = tab === "my_stories" ? myTotalViews : totalViews;
 
   const openEditor = (article: any = null) => {
+    if (article && !isAdmin && !isStoryOwner(article)) {
+      alert("Permission denied: You can only edit stories that you authored.");
+      return;
+    }
+    if (tab === "all_stories" || tab === "my_stories") {
+      setStoryTabMemory(tab);
+    }
     setActiveArticle(article);
     setTab("editor");
   };
 
   const handleEditorClose = () => {
-    setTab("stories");
+    setTab(storyTabMemory || "all_stories");
     setActiveArticle(null);
     fetchData(session?.user?.id, session?.user?.email); // Refresh after edit
   };
 
   if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
 
-  if (!isApproved && role !== "admin" && session?.user?.email !== "forbesclone09@gmail.com") {
+  if (!isApproved && !isAdmin) {
     return (
       <PendingApprovalScreen
         session={session}
@@ -171,21 +262,22 @@ function DashboardPage() {
     );
   }
 
-  const dashboardTabs: any[] = [
-    ["stories", "My stories", FileText],
+  const dashboardTabs: [string, string, any, number?, string?][] = [
+    ["all_stories", "All stories", Globe, rows.length, "neutral"],
+    ["my_stories", "My stories", BookOpen, myRows.length, "neutral"],
     ["editor", "Editor", PenLine],
     ["profile", "Profile", User],
   ];
-  if (role === "admin" || session?.user?.email === "forbesclone09@gmail.com") {
-    dashboardTabs.push(["authors", "Authors", Users, pendingCount]); 
+  if (isAdmin) {
+    dashboardTabs.push(["authors", "Authors", Users, pendingCount, "warning"]); 
   }
 
   return (
     <div className="mx-auto w-full max-w-[1240px] px-5 py-10 sm:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground pb-5">
         <div>
-          <p className="kicker">Author dashboard {role === 'admin' && <span className="text-brand ml-2">(Admin Access)</span>}</p>
-          <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem]">Welcome back, {session?.user?.email}</h1>
+          <p className="kicker">Author dashboard {isAdmin && <span className="text-brand ml-2">(Admin Access)</span>}</p>
+          <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem]">Welcome back, {userFullName || session?.user?.email}</h1>
         </div>
         <div className="flex gap-4">
           <button
@@ -208,30 +300,43 @@ function DashboardPage() {
 
       <div className="grid grid-cols-2 border-b border-rule lg:grid-cols-4">
         {[
-          ["Published", rows.filter((r) => r.status === "Published").length],
-          ["In review", rows.filter((r) => r.status === "In review").length],
-          ["Drafts", rows.filter((r) => r.status === "Draft").length],
-          ["Total views", totalViews.toLocaleString()],
+          ["Published", displayedStats.filter((r) => r.status === "Published").length],
+          ["In review", displayedStats.filter((r) => r.status === "In review").length],
+          ["Drafts", displayedStats.filter((r) => r.status === "Draft").length],
+          ["Total views", displayedViews.toLocaleString()],
         ].map(([label, value]) => (
           <div key={label} className="border-rule py-6 pr-4 odd:border-r lg:border-r lg:last:border-r-0 lg:px-6 lg:first:pl-0">
-            <p className="kicker text-ink-soft">{label}</p>
+            <p className="kicker text-ink-soft">{tab === "my_stories" ? `My ${label}` : label}</p>
             <p className="mt-2 font-display text-[2rem] leading-none">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-8 flex gap-6 border-b border-rule">
-        {dashboardTabs.map(([key, label, Icon, badgeCount]) => (
+      <div className="mt-8 flex gap-6 border-b border-rule overflow-x-auto">
+        {dashboardTabs.map(([key, label, Icon, badgeCount, badgeType]) => (
           <button
             key={key}
-            onClick={() => key === "stories" ? handleEditorClose() : setTab(key)}
-            className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold transition-colors ${
+            onClick={() => {
+              if (key === "all_stories" || key === "my_stories") {
+                setTab(key as any);
+                setStoryTabMemory(key as any);
+              } else {
+                setTab(key as any);
+              }
+            }}
+            className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold whitespace-nowrap transition-colors ${
               tab === key ? "border-brand text-foreground" : "border-transparent text-ink-soft hover:text-foreground"
             }`}
           >
             <Icon className="h-4 w-4" /> {label}
-            {typeof badgeCount === "number" && badgeCount > 0 && (
-              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[0.65rem] font-bold text-white leading-none">
+            {typeof badgeCount === "number" && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none ${
+                  badgeType === "warning" && badgeCount > 0
+                    ? "bg-amber-500 text-white"
+                    : "bg-secondary text-foreground border border-rule"
+                }`}
+              >
                 {badgeCount}
               </span>
             )}
@@ -239,9 +344,41 @@ function DashboardPage() {
         ))}
       </div>
 
-      {tab === "stories" ? (
+      {tab === "all_stories" || tab === "my_stories" ? (
         <section className="mt-6">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rule pb-4">
+            <div>
+              <h2 className="headline text-[1.4rem] text-foreground">
+                {tab === "all_stories" ? "Newsroom Stories" : "My Uploaded Stories"}
+              </h2>
+              <p className="text-[0.82rem] text-ink-soft mt-0.5">
+                {tab === "all_stories" ? (
+                  isAdmin ? (
+                    <span>All articles published across Forbes Germany. As an <strong className="text-foreground">Admin</strong>, you can edit any story.</span>
+                  ) : (
+                    <span>All articles across Forbes Germany. You can edit your own stories and view others.</span>
+                  )
+                ) : (
+                  <span>Stories uploaded and published by your account ({myRows.length} total). You can edit any story in this list.</span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search stories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 text-[0.8rem] border border-rule bg-background focus:border-foreground outline-none w-48 sm:w-60"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
             {(["All", ...statuses] as const).map((s) => (
               <button
                 key={s}
@@ -254,44 +391,108 @@ function DashboardPage() {
               </button>
             ))}
           </div>
-          <ul className="mt-4 divide-y divide-rule border-y border-rule">
-            {visible.map(({ article, status, views }) => (
-              <li key={article.slug} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
-                <img src={article.image} alt="" className="h-16 w-24 shrink-0 object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="kicker">{article.category}</p>
-                  <Link
-                    to="/article/$slug"
-                    params={{ slug: article.slug }}
-                    className="mt-1 block font-display text-[1.1rem] leading-snug hover:text-brand"
-                  >
-                    {article.title}
-                  </Link>
-                  <p className="mt-1 text-[0.8rem] text-ink-soft">
-                    {article.author.name} · {article.published} · {article.readTime} min read
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-4 text-[0.8rem]">
-                  <span
-                    className={`border px-2 py-1 font-semibold ${
-                      status === "Published" ? "border-foreground" : status === "In review" ? "border-brand text-brand" : "border-rule text-ink-soft"
-                    }`}
-                  >
-                    {status}
-                  </span>
-                  <span className="inline-flex w-20 items-center gap-1 text-ink-soft">
-                    <Eye className="h-3.5 w-3.5" /> {views ? views.toLocaleString() : "—"}
-                  </span>
-                  <button onClick={() => openEditor(article)} className="font-semibold hover:text-brand">
-                    Edit
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+
+          {visible.length === 0 ? (
+            tab === "my_stories" ? (
+              <div className="py-16 text-center border border-dashed border-rule bg-secondary/15 my-6 p-8">
+                <BookOpen className="h-10 w-10 text-ink-soft mx-auto mb-3" />
+                <h3 className="font-display text-[1.3rem]">No personal stories found</h3>
+                <p className="mt-2 text-[0.85rem] text-ink-soft max-w-md mx-auto">
+                  {searchQuery || filter !== "All"
+                    ? "No personal stories match your current filter criteria."
+                    : "You haven't uploaded any stories yet. Start drafting your first article to publish on Forbes Germany."}
+                </p>
+                <button
+                  onClick={() => openEditor()}
+                  className="mt-6 inline-flex items-center gap-2 bg-foreground px-5 py-2.5 text-[0.78rem] font-semibold tracking-wider text-background uppercase hover:bg-brand"
+                >
+                  <Plus className="h-4 w-4" /> Start Writing
+                </button>
+              </div>
+            ) : (
+              <div className="py-16 text-center border border-dashed border-rule bg-secondary/15 my-6 p-8">
+                <FileText className="h-10 w-10 text-ink-soft mx-auto mb-3" />
+                <h3 className="font-display text-[1.3rem]">No stories match your search</h3>
+                <p className="mt-2 text-[0.85rem] text-ink-soft max-w-md mx-auto">
+                  Try clearing the search query or status filter to see all stories.
+                </p>
+              </div>
+            )
+          ) : (
+            <ul className="mt-4 divide-y divide-rule border-y border-rule">
+              {visible.map(({ article, status, views, isOwner }) => {
+                const canEdit = isAdmin || isOwner;
+                return (
+                  <li key={article.slug} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                    <img src={article.image} alt="" className="h-16 w-24 shrink-0 object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="kicker">{article.category}</p>
+                        {isOwner && (
+                          <span className="border border-blue-500/30 bg-blue-500/10 text-blue-700 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider">
+                            Your Story
+                          </span>
+                        )}
+                      </div>
+                      <Link
+                        to="/article/$slug"
+                        params={{ slug: article.slug }}
+                        className="mt-1 block font-display text-[1.1rem] leading-snug hover:text-brand"
+                      >
+                        {article.title}
+                      </Link>
+                      <p className="mt-1 text-[0.8rem] text-ink-soft">
+                        <span className="font-medium text-foreground">{article.author.name}</span> · {article.published} · {article.readTime} min read
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-4 text-[0.8rem]">
+                      <span
+                        className={`border px-2 py-1 font-semibold text-[0.75rem] ${
+                          status === "Published" ? "border-foreground" : status === "In review" ? "border-brand text-brand" : "border-rule text-ink-soft"
+                        }`}
+                      >
+                        {status}
+                      </span>
+                      <span className="inline-flex w-20 items-center gap-1 text-ink-soft">
+                        <Eye className="h-3.5 w-3.5" /> {views ? views.toLocaleString() : "—"}
+                      </span>
+                      {canEdit ? (
+                        <button
+                          onClick={() => openEditor(article)}
+                          className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-brand px-3 py-1 border border-rule hover:border-foreground transition-colors"
+                        >
+                          <Edit2 className="h-3 w-3" /> Edit
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-soft/70">
+                            <Lock className="h-3 w-3" /> Read-only
+                          </span>
+                          <Link
+                            to="/article/$slug"
+                            params={{ slug: article.slug }}
+                            className="text-[0.78rem] font-semibold text-ink-soft hover:text-foreground underline"
+                          >
+                            View
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       ) : tab === "editor" ? (
-        <Editor initialArticle={activeArticle} onClose={handleEditorClose} session={session} />
+        <Editor
+          initialArticle={activeArticle}
+          onClose={handleEditorClose}
+          session={session}
+          userFullName={userFullName}
+          isAdmin={isAdmin}
+          isOwner={isStoryOwner}
+        />
       ) : tab === "profile" ? (
         <ProfileManager session={session} />
       ) : (
@@ -561,6 +762,10 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
   const [authors, setAuthors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAuthor, setEditingAuthor] = useState<any>(null);
+  const [roleModalAuthor, setRoleModalAuthor] = useState<any>(null);
+  const [roleModalSelectedRole, setRoleModalSelectedRole] = useState<string>("author");
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
   const [newAuthor, setNewAuthor] = useState({
@@ -622,6 +827,64 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
     loadAuthors();
   }, []);
 
+  const handleRoleChange = async (author: any, newRole: string) => {
+    if (author.email === "forbesclone09@gmail.com" && newRole !== "admin") {
+      alert("The primary super administrator account cannot be demoted.");
+      return;
+    }
+
+    setUpdatingRoleId(author.id);
+    setActionFeedback(null);
+
+    try {
+      const updatePayload: any = {
+        role: newRole,
+        updated_at: new Date().toISOString(),
+      };
+      if (newRole === "admin") {
+        updatePayload.is_approved = true;
+      }
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update(updatePayload)
+        .eq("id", author.id);
+
+      if (profileError) throw profileError;
+
+      // Sync user_roles table
+      await supabase
+        .from("user_roles")
+        .upsert({
+          user_id: author.id,
+          role: newRole,
+        });
+
+      // Update state locally
+      setAuthors((prev) =>
+        prev.map((a) =>
+          a.id === author.id
+            ? { ...a, role: newRole, is_approved: newRole === "admin" ? true : a.is_approved }
+            : a
+        )
+      );
+
+      setActionFeedback({
+        text: `Role for ${author.full_name || author.email} updated to ${newRole.toUpperCase()} successfully.`,
+        type: "success",
+      });
+      setTimeout(() => setActionFeedback(null), 4000);
+      setRoleModalAuthor(null);
+    } catch (err: any) {
+      setActionFeedback({
+        text: `Failed to update role: ${err.message || "Unknown error"}`,
+        type: "error",
+      });
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
   const handleApproveAuthor = async (author: any) => {
     setModalSaving(true);
     const { error } = await supabase
@@ -670,6 +933,7 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
     const isAppr =
       editingAuthor.is_approved === true ||
       editingAuthor.is_approved === "true" ||
+      editingAuthor.role === "admin" ||
       editingAuthor.email === "forbesclone09@gmail.com";
 
     const { error: profileError } = await supabase.from("profiles").upsert({
@@ -716,6 +980,13 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
       bio: newAuthor.bio,
       is_approved: true, // admin added authors are approved by default
     });
+
+    if (!profileError) {
+      await supabase.from("user_roles").upsert({
+        user_id: newId,
+        role: newAuthor.role,
+      });
+    }
 
     setModalSaving(false);
     if (profileError) {
@@ -764,9 +1035,9 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
     <section className="mt-6">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-          <h2 className="headline text-[1.8rem]">Manage Authors</h2>
+          <h2 className="headline text-[1.8rem]">Manage Authors & Roles</h2>
           <p className="mt-1 text-[0.85rem] text-ink-soft">
-            Review author registrations, approve dashboard access, and manage contributor profiles.
+            Review author registrations, assign administrator permissions, approve dashboard access, and manage contributor profiles.
           </p>
         </div>
         <button
@@ -779,6 +1050,21 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
           + Add Author
         </button>
       </div>
+
+      {actionFeedback && (
+        <div
+          className={`mb-6 p-3 text-[0.85rem] font-medium border flex items-center justify-between ${
+            actionFeedback.type === "success"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              : "bg-red-50 text-red-800 border-red-200"
+          }`}
+        >
+          <span>{actionFeedback.text}</span>
+          <button onClick={() => setActionFeedback(null)} className="text-xs uppercase font-bold ml-4">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {pendingAuthors.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-amber-500/30 bg-amber-500/10 p-4 text-[0.88rem] text-amber-900">
@@ -837,11 +1123,11 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
       </div>
 
       <div className="border border-rule overflow-x-auto">
-        <table className="w-full text-left text-[0.9rem] min-w-[700px]">
+        <table className="w-full text-left text-[0.9rem] min-w-[760px]">
           <thead className="bg-secondary/50 border-b border-rule">
             <tr>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Author</th>
-              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Role</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Role (Assign)</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Status</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Contact</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem] text-right">Actions</th>
@@ -850,22 +1136,42 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
           <tbody className="divide-y divide-rule">
             {filteredAuthors.map((author) => {
               const isAppr = author.email === "forbesclone09@gmail.com" || author.is_approved;
+              const isSuper = author.email === "forbesclone09@gmail.com";
               return (
                 <tr key={author.id} className="hover:bg-secondary/20">
                   <td className="py-4 px-4">
-                    <div className="font-semibold text-foreground">{author.full_name || "Author"}</div>
+                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                      {author.full_name || "Author"}
+                      {author.role === "admin" && (
+                        <Shield className="h-3.5 w-3.5 text-brand" title="Administrator" />
+                      )}
+                    </div>
                     <div className="text-[0.8rem] text-ink-soft">{author.email}</div>
                   </td>
-                  <td className="py-4 px-4">
-                    <span
-                      className={`inline-block px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border ${
-                        author.role === "admin"
-                          ? "border-brand text-brand bg-brand/5"
-                          : "border-rule text-ink-soft"
-                      }`}
-                    >
-                      {author.role}
-                    </span>
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={author.role || "author"}
+                        disabled={updatingRoleId === author.id || isSuper}
+                        onChange={(e) => handleRoleChange(author, e.target.value)}
+                        className={`text-[0.74rem] font-bold uppercase tracking-wider border px-2 py-1 bg-background rounded-none cursor-pointer outline-none transition-colors ${
+                          author.role === "admin"
+                            ? "border-brand text-brand bg-brand/5 focus:border-brand font-extrabold"
+                            : author.role === "author"
+                            ? "border-foreground/30 text-foreground focus:border-foreground"
+                            : "border-rule text-ink-soft focus:border-foreground"
+                        } ${isSuper ? "cursor-not-allowed opacity-80" : ""}`}
+                        title={isSuper ? "Primary administrator role cannot be altered" : "Assign new role to this user"}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="author">Author</option>
+                        <option value="contributor">Contributor</option>
+                        <option value="user">User</option>
+                      </select>
+                      {updatingRoleId === author.id && (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     {isAppr ? (
@@ -884,7 +1190,7 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                     {!author.phone && !author.city && <span className="text-ink-soft/50">—</span>}
                   </td>
                   <td className="py-4 px-4 text-right whitespace-nowrap">
-                    {author.email !== "forbesclone09@gmail.com" && !isAppr && (
+                    {!isSuper && !isAppr && (
                       <button
                         onClick={() => handleApproveAuthor(author)}
                         className="bg-emerald-600 text-white px-3 py-1 text-[0.75rem] font-semibold uppercase hover:bg-emerald-700 mr-3 transition-colors"
@@ -892,7 +1198,7 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                         Approve
                       </button>
                     )}
-                    {author.email !== "forbesclone09@gmail.com" && isAppr && (
+                    {!isSuper && isAppr && (
                       <button
                         onClick={() => handleRevokeAuthor(author)}
                         className="text-[0.75rem] font-semibold text-amber-700 hover:text-amber-900 hover:underline mr-3"
@@ -902,6 +1208,15 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                     )}
                     <button
                       onClick={() => {
+                        setRoleModalAuthor({ ...author });
+                        setRoleModalSelectedRole(author.role || "author");
+                      }}
+                      className="text-[0.8rem] font-semibold text-brand hover:underline mr-3"
+                    >
+                      Assign Role
+                    </button>
+                    <button
+                      onClick={() => {
                         setErrorMsg("");
                         setEditingAuthor({ ...author });
                       }}
@@ -909,7 +1224,7 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                     >
                       Edit Details
                     </button>
-                    {author.role !== "admin" && author.email !== "forbesclone09@gmail.com" && (
+                    {author.role !== "admin" && !isSuper && (
                       <button
                         onClick={() => handleRemoveAuthor(author)}
                         className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700"
@@ -924,6 +1239,98 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
           </tbody>
         </table>
       </div>
+
+      {/* Dedicated Assign Role Modal */}
+      {roleModalAuthor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg border border-rule bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-2 border-b border-rule pb-3">
+              <Shield className="h-5 w-5 text-brand" />
+              <h3 className="font-display text-[1.4rem] text-foreground">
+                Assign Role to {roleModalAuthor.full_name || roleModalAuthor.email}
+              </h3>
+            </div>
+            <p className="mt-2 text-[0.85rem] text-ink-soft">
+              Select a permission level below. Administrators can edit all stories, approve contributors, and assign roles to others.
+            </p>
+
+            <div className="mt-5 space-y-3">
+              {[
+                {
+                  id: "admin",
+                  name: "Administrator",
+                  badge: "Full Access",
+                  desc: "Can edit all stories across newsroom, approve or suspend authors, assign roles, and manage site settings.",
+                },
+                {
+                  id: "author",
+                  name: "Author",
+                  badge: "Standard Access",
+                  desc: "Can write, draft, pitch, and publish stories. Can edit their own stories and customize their profile.",
+                },
+                {
+                  id: "contributor",
+                  name: "Contributor",
+                  badge: "Guest Writer",
+                  desc: "Can submit draft articles for review and manage their personal drafts.",
+                },
+                {
+                  id: "user",
+                  name: "Reader / User",
+                  badge: "Subscriber",
+                  desc: "Standard subscriber account. Does not have access to author dashboard or publication tools.",
+                },
+              ].map((r) => (
+                <label
+                  key={r.id}
+                  onClick={() => setRoleModalSelectedRole(r.id)}
+                  className={`flex items-start gap-3 p-3.5 border cursor-pointer transition-colors ${
+                    roleModalSelectedRole === r.id
+                      ? "border-brand bg-brand/5"
+                      : "border-rule bg-background hover:bg-secondary/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="roleOption"
+                    value={r.id}
+                    checked={roleModalSelectedRole === r.id}
+                    onChange={() => setRoleModalSelectedRole(r.id)}
+                    className="mt-1 accent-brand"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground text-[0.92rem]">{r.name}</span>
+                      <span className="text-[0.7rem] font-bold uppercase tracking-wider px-2 py-0.5 border border-rule bg-secondary/50">
+                        {r.badge}
+                      </span>
+                    </div>
+                    <p className="text-[0.8rem] text-ink-soft mt-1 leading-relaxed">{r.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2 pt-3 border-t border-rule">
+              <button
+                type="button"
+                onClick={() => setRoleModalAuthor(null)}
+                className="border border-rule px-4 py-2 text-[0.75rem] font-semibold uppercase hover:bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updatingRoleId === roleModalAuthor.id}
+                onClick={() => handleRoleChange(roleModalAuthor, roleModalSelectedRole)}
+                className="bg-foreground px-5 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand disabled:opacity-50"
+              >
+                {updatingRoleId === roleModalAuthor.id ? "Assigning..." : "Confirm Role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Details Modal */}
       {editingAuthor && (
@@ -946,15 +1353,16 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
               </div>
 
               <div>
-                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role</label>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role (Assign)</label>
                 <select
                   value={editingAuthor.role || "author"}
                   onChange={(e) => setEditingAuthor({ ...editingAuthor, role: e.target.value })}
                   className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
                 >
-                  <option value="author">Author</option>
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
+                  <option value="admin">Admin (Full access to all stories & author management)</option>
+                  <option value="author">Author (Standard story writing & personal editing)</option>
+                  <option value="contributor">Contributor (Draft submissions)</option>
+                  <option value="user">User (Reader account)</option>
                 </select>
               </div>
 
@@ -1069,15 +1477,16 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
               </div>
 
               <div>
-                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role</label>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role (Assign)</label>
                 <select
                   value={newAuthor.role}
                   onChange={(e) => setNewAuthor({ ...newAuthor, role: e.target.value })}
                   className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
                 >
-                  <option value="author">Author</option>
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
+                  <option value="author">Author (Standard author access)</option>
+                  <option value="admin">Admin (Full administrative & editing access)</option>
+                  <option value="contributor">Contributor (Guest author)</option>
+                  <option value="user">User (Reader account)</option>
                 </select>
               </div>
 
@@ -1127,8 +1536,21 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
     </section>
   );
 }
-
-function Editor({ initialArticle, onClose, session }: { initialArticle: any, onClose: () => void, session: any }) {
+function Editor({ 
+  initialArticle, 
+  onClose, 
+  session, 
+  userFullName, 
+  isAdmin, 
+  isOwner 
+}: { 
+  initialArticle: any; 
+  onClose: () => void; 
+  session: any; 
+  userFullName?: string; 
+  isAdmin?: boolean; 
+  isOwner?: (art: any) => boolean; 
+}) {
   const [title, setTitle] = useState(initialArticle?.title || "");
   const [excerpt, setExcerpt] = useState(initialArticle?.deck || "");
   const [category, setCategory] = useState(initialArticle?.category || "Business");
@@ -1154,6 +1576,26 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
   const [inlineImageUrl, setInlineImageUrl] = useState<string>("");
   const [inlineImageAlt, setInlineImageAlt] = useState<string>("");
   const [inlineUploading, setInlineUploading] = useState<boolean>(false);
+
+  // Permission Guard
+  const hasEditPermission = !initialArticle || isAdmin || (isOwner && isOwner(initialArticle));
+  if (!hasEditPermission) {
+    return (
+      <div className="my-12 p-8 border border-red-200 bg-red-50 text-center max-w-xl mx-auto">
+        <AlertTriangle className="h-10 w-10 text-red-600 mx-auto mb-3" />
+        <h3 className="font-display text-[1.4rem] text-red-900">Access Restricted</h3>
+        <p className="mt-2 text-[0.88rem] text-red-700 leading-relaxed">
+          You do not have permission to edit this story because it was authored by another contributor. Only newsroom administrators or the original author can edit it.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-6 bg-foreground text-background px-5 py-2.5 text-[0.78rem] font-semibold uppercase hover:bg-brand"
+        >
+          Return to Stories
+        </button>
+      </div>
+    );
+  }
 
   // Core image upload helper (Supabase storage with Base64 fallback)
   const uploadImageFile = async (file: File): Promise<string> => {
@@ -1299,7 +1741,15 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
     const wordCount = content.split(/\s+/).filter(Boolean).length;
     const readTimeCalc = `${Math.max(1, Math.round(wordCount / 200))} min read`;
 
-    const articleData = {
+    const isNew = !initialArticle;
+    const authorName = initialArticle
+      ? (typeof initialArticle.author === "string" ? initialArticle.author : initialArticle.author?.name || "Staff Writer")
+      : (userFullName || session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Staff Writer");
+
+    const authorId = initialArticle?.author_id || (isNew ? session?.user?.id : null);
+    const authorEmail = initialArticle?.author_email || (isNew ? session?.user?.email : null);
+
+    const articleData: any = {
       slug,
       title,
       excerpt,
@@ -1307,13 +1757,22 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
       body: paragraphs,
       image_url: imageUrl || initialArticle?.image || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80",
       image_alt: title || "Article Image",
-      author: session?.user?.email?.split('@')[0] || "Unknown",
+      author: authorName,
       read_time: readTimeCalc,
       published_at: initialArticle?.published_at || new Date().toISOString(),
-      is_premium: false
+      is_premium: false,
+      author_id: authorId,
+      author_email: authorEmail,
     };
 
-    const { error } = await supabase.from('articles').upsert(articleData, { onConflict: 'slug' });
+    let { error } = await supabase.from('articles').upsert(articleData, { onConflict: 'slug' });
+    if (error && (error.message.includes('author_id') || error.message.includes('author_email') || (error as any).code === '42703')) {
+      const fallbackData = { ...articleData };
+      delete fallbackData.author_id;
+      delete fallbackData.author_email;
+      const res = await supabase.from('articles').upsert(fallbackData, { onConflict: 'slug' });
+      error = res.error;
+    }
     
     if (error) {
       setSaved(`Error: ${error.message}`);
