@@ -161,16 +161,26 @@ function ArticlePage() {
         <div className="lg:col-span-8">
           <div className="mt-6 space-y-6">
             {bodyBlocks.map((block: any, idx: number) => {
-              if (block.type === 'paragraph') {
+              const content = typeof block === 'string' ? block : block?.content || '';
+              if (!content) return null;
+              const isHtmlBlock = block.type === 'html' || /<(div|h[1-6]|blockquote|pre|table|ul|ol|figure|iframe|p|section|article|code)/i.test(content);
+              
+              if (isHtmlBlock) {
                 return (
-                  <p 
+                  <div 
                     key={idx} 
-                    className="text-[1.05rem] leading-[1.75] text-foreground/90"
-                    dangerouslySetInnerHTML={{ __html: block.content }}
+                    className="article-prose"
+                    dangerouslySetInnerHTML={{ __html: content }}
                   />
                 );
               }
-              return null;
+              return (
+                <p 
+                  key={idx} 
+                  className="text-[1.05rem] leading-[1.75] text-foreground/90"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              );
             })}
           </div>
         </div>
