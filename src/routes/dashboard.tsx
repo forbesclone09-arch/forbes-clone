@@ -23,6 +23,12 @@ import {
   X,
   Edit2,
   Trash2,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  RefreshCw,
+  LogOut,
 } from "lucide-react";
 
 import { navCategories, siteName, type CategoryName } from "@/data/content";
@@ -47,6 +53,8 @@ function DashboardPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const [session, setSession] = useState<any>(null);
   const [role, setRole] = useState<string>("user");
+  const [isApproved, setIsApproved] = useState<boolean>(true);
+  const [pendingCount, setPendingCount] = useState<number>(0);
   const [articles, setArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,26 +64,53 @@ function DashboardPage() {
         navigate({ to: "/login" });
       } else {
         setSession(session);
-        fetchData(session.user.id);
+        fetchData(session.user.id, session.user.email);
       }
     });
   }, [navigate]);
 
-  const fetchData = async (userId: string) => {
-    // Fetch role
+  const fetchData = async (userId: string, userEmail?: string) => {
+    setLoading(true);
+    const email = userEmail || session?.user?.email || "";
+    const isSuperAdmin = email === "forbesclone09@gmail.com";
+
+    // 1. Fetch profile to check role & approval status
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role, is_approved, full_name")
+      .eq("id", userId)
+      .maybeSingle();
+
+    // 2. Fetch role fallback
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
     
-    const userRole = roleData?.role || "user";
+    const isAdmin = isSuperAdmin || roleData?.role === "admin" || profileData?.role === "admin";
+    const userRole = isAdmin ? "admin" : (profileData?.role || roleData?.role || "author");
     setRole(userRole);
+
+    // Super admin or admin is always approved. Non-admin requires profileData.is_approved === true
+    const approved = isAdmin ? true : (profileData?.is_approved ?? false);
+    setIsApproved(approved);
+
+    if (isAdmin) {
+      const { count } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("is_approved", false);
+      if (count !== null) setPendingCount(count);
+    }
+
+    if (!approved && !isAdmin) {
+      setLoading(false);
+      return;
+    }
 
     // Fetch articles
     let query = supabase.from("articles").select("*").order("created_at", { ascending: false });
-    
-    // If not admin, maybe restrict to their own (for now, we'll just show all since auth isn't fully linking articles to authors yet)
     const { data: articlesData } = await query;
     if (articlesData) {
       const mapped = articlesData.map((row: any) => ({
@@ -119,10 +154,19 @@ function DashboardPage() {
   const handleEditorClose = () => {
     setTab("stories");
     setActiveArticle(null);
-    fetchData(session?.user?.id); // Refresh after edit
+    fetchData(session?.user?.id, session?.user?.email); // Refresh after edit
   };
 
   if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
+
+  if (!isApproved && role !== "admin" && session?.user?.email !== "forbesclone09@gmail.com") {
+    return (
+      <PendingApprovalScreen
+        session={session}
+        onRefresh={() => fetchData(session.user.id, session.user.email)}
+      />
+    );
+  }
 
   const dashboardTabs: any[] = [
     ["stories", "My stories", FileText],
@@ -130,7 +174,7 @@ function DashboardPage() {
     ["profile", "Profile", User],
   ];
   if (role === "admin" || session?.user?.email === "forbesclone09@gmail.com") {
-    dashboardTabs.push(["authors", "Authors", Users]); 
+    dashboardTabs.push(["authors", "Authors", Users, pendingCount]); 
   }
 
   return (
@@ -174,7 +218,7 @@ function DashboardPage() {
       </div>
 
       <div className="mt-8 flex gap-6 border-b border-rule">
-        {dashboardTabs.map(([key, label, Icon]) => (
+        {dashboardTabs.map(([key, label, Icon, badgeCount]) => (
           <button
             key={key}
             onClick={() => key === "stories" ? handleEditorClose() : setTab(key)}
@@ -183,6 +227,11 @@ function DashboardPage() {
             }`}
           >
             <Icon className="h-4 w-4" /> {label}
+            {typeof badgeCount === "number" && badgeCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[0.65rem] font-bold text-white leading-none">
+                {badgeCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -243,8 +292,74 @@ function DashboardPage() {
       ) : tab === "profile" ? (
         <ProfileManager session={session} />
       ) : (
-        <AuthorsManager session={session} />
+        <AuthorsManager session={session} onPendingChange={(c) => setPendingCount(c)} />
       )}
+    </div>
+  );
+}
+
+function PendingApprovalScreen({ session, onRefresh }: { session: any; onRefresh: () => void }) {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(false);
+
+  const handleCheck = async () => {
+    setChecking(true);
+    await onRefresh();
+    setTimeout(() => setChecking(false), 500);
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-[760px] px-5 py-16 sm:px-8">
+      <div className="border border-rule bg-background p-8 sm:p-12 shadow-sm text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 mb-6">
+          <Clock className="h-8 w-8" />
+        </div>
+
+        <p className="kicker text-amber-600">Contributor Verification</p>
+        <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem] text-foreground">
+          Account Pending Approval
+        </h1>
+
+        <p className="mt-4 text-[0.98rem] leading-relaxed text-ink-soft max-w-xl mx-auto">
+          Thank you for joining <strong>{siteName}</strong>. Your author registration is currently awaiting review by our editorial administration. Once approved, you will have immediate access to draft, pitch, and publish stories.
+        </p>
+
+        <div className="mt-8 mx-auto max-w-md bg-secondary/40 border border-rule p-4 text-left space-y-2 text-[0.85rem]">
+          <div className="flex justify-between">
+            <span className="text-ink-soft">Registered Account:</span>
+            <span className="font-semibold text-foreground">{session?.user?.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-soft">Current Status:</span>
+            <span className="inline-flex items-center gap-1.5 font-bold text-amber-600">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+              Awaiting Admin Approval
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-wrap justify-center gap-4">
+          <button
+            onClick={handleCheck}
+            disabled={checking}
+            className="flex items-center gap-2 bg-foreground px-6 py-3 text-[0.8rem] font-semibold uppercase tracking-wider text-background hover:bg-brand disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
+            {checking ? "Checking Status..." : "Check Status"}
+          </button>
+
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/login" });
+            }}
+            className="flex items-center gap-2 border border-rule px-6 py-3 text-[0.8rem] font-semibold uppercase tracking-wider hover:bg-secondary transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -439,11 +554,12 @@ function ProfileManager({ session }: { session: any }) {
   );
 }
 
-function AuthorsManager({ session }: { session: any }) {
+function AuthorsManager({ session, onPendingChange }: { session: any; onPendingChange?: (count: number) => void }) {
   const [authors, setAuthors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAuthor, setEditingAuthor] = useState<any>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
   const [newAuthor, setNewAuthor] = useState({
     email: "",
     full_name: "",
@@ -452,6 +568,7 @@ function AuthorsManager({ session }: { session: any }) {
     address: "",
     city: "",
     bio: "",
+    is_approved: true,
   });
   const [modalSaving, setModalSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -467,6 +584,7 @@ function AuthorsManager({ session }: { session: any }) {
     // 2. Query user_roles as well to make sure we don't miss anyone
     const { data: rolesData } = await supabase.from("user_roles").select("*");
 
+    let allAuthors: any[] = [];
     if (profilesData && profilesData.length > 0) {
       const profileUserIds = new Set(profilesData.map((p: any) => p.id));
       const extraAuthors = (rolesData || [])
@@ -476,18 +594,24 @@ function AuthorsManager({ session }: { session: any }) {
           email: r.user_id,
           full_name: "Author",
           role: r.role,
+          is_approved: r.role === "admin" || r.user_id === session?.user?.id,
         }));
-      setAuthors([...profilesData, ...extraAuthors]);
+      allAuthors = [...profilesData, ...extraAuthors];
     } else if (rolesData) {
-      setAuthors(
-        rolesData.map((r: any) => ({
-          id: r.user_id,
-          email: r.user_id,
-          full_name: "Author",
-          role: r.role,
-        }))
-      );
+      allAuthors = rolesData.map((r: any) => ({
+        id: r.user_id,
+        email: r.user_id,
+        full_name: "Author",
+        role: r.role,
+        is_approved: r.role === "admin" || r.user_id === session?.user?.id,
+      }));
     }
+
+    setAuthors(allAuthors);
+    const unapprovedCount = allAuthors.filter(
+      (a) => !a.is_approved && a.email !== "forbesclone09@gmail.com"
+    ).length;
+    if (onPendingChange) onPendingChange(unapprovedCount);
     setLoading(false);
   };
 
@@ -495,11 +619,55 @@ function AuthorsManager({ session }: { session: any }) {
     loadAuthors();
   }, []);
 
+  const handleApproveAuthor = async (author: any) => {
+    setModalSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_approved: true, updated_at: new Date().toISOString() })
+      .eq("id", author.id);
+
+    setModalSaving(false);
+    if (error) {
+      alert(`Error approving author: ${error.message}`);
+    } else {
+      loadAuthors();
+    }
+  };
+
+  const handleRevokeAuthor = async (author: any) => {
+    if (
+      !confirm(
+        `Are you sure you want to suspend or revoke dashboard access for ${
+          author.full_name || author.email
+        }? They will no longer be able to access the author dashboard.`
+      )
+    ) {
+      return;
+    }
+    setModalSaving(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_approved: false, updated_at: new Date().toISOString() })
+      .eq("id", author.id);
+
+    setModalSaving(false);
+    if (error) {
+      alert(`Error updating author: ${error.message}`);
+    } else {
+      loadAuthors();
+    }
+  };
+
   const handleSaveAuthorEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAuthor) return;
     setModalSaving(true);
     setErrorMsg("");
+
+    const isAppr =
+      editingAuthor.is_approved === true ||
+      editingAuthor.is_approved === "true" ||
+      editingAuthor.email === "forbesclone09@gmail.com";
 
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: editingAuthor.id,
@@ -510,6 +678,7 @@ function AuthorsManager({ session }: { session: any }) {
       address: editingAuthor.address,
       city: editingAuthor.city,
       bio: editingAuthor.bio,
+      is_approved: isAppr,
       updated_at: new Date().toISOString(),
     });
 
@@ -542,6 +711,7 @@ function AuthorsManager({ session }: { session: any }) {
       address: newAuthor.address,
       city: newAuthor.city,
       bio: newAuthor.bio,
+      is_approved: true, // admin added authors are approved by default
     });
 
     setModalSaving(false);
@@ -557,6 +727,7 @@ function AuthorsManager({ session }: { session: any }) {
         address: "",
         city: "",
         bio: "",
+        is_approved: true,
       });
       loadAuthors();
     }
@@ -571,6 +742,19 @@ function AuthorsManager({ session }: { session: any }) {
     loadAuthors();
   };
 
+  const pendingAuthors = authors.filter(
+    (a) => !a.is_approved && a.email !== "forbesclone09@gmail.com"
+  );
+  const approvedAuthors = authors.filter(
+    (a) => a.is_approved || a.email === "forbesclone09@gmail.com"
+  );
+
+  const filteredAuthors = authors.filter((a) => {
+    if (statusFilter === "pending") return !a.is_approved && a.email !== "forbesclone09@gmail.com";
+    if (statusFilter === "approved") return a.is_approved || a.email === "forbesclone09@gmail.com";
+    return true;
+  });
+
   if (loading) return <div className="mt-6 p-4 text-ink-soft">Loading authors...</div>;
 
   return (
@@ -579,7 +763,7 @@ function AuthorsManager({ session }: { session: any }) {
         <div>
           <h2 className="headline text-[1.8rem]">Manage Authors</h2>
           <p className="mt-1 text-[0.85rem] text-ink-soft">
-            View, edit roles, contact details, and manage system authors.
+            Review author registrations, approve dashboard access, and manage contributor profiles.
           </p>
         </div>
         <button
@@ -593,60 +777,147 @@ function AuthorsManager({ session }: { session: any }) {
         </button>
       </div>
 
+      {pendingAuthors.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-amber-500/30 bg-amber-500/10 p-4 text-[0.88rem] text-amber-900">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <span>
+              <strong>{pendingAuthors.length} author application(s)</strong> awaiting administrator approval.
+            </span>
+          </div>
+          {statusFilter !== "pending" && (
+            <button
+              onClick={() => setStatusFilter("pending")}
+              className="text-[0.78rem] font-bold uppercase tracking-wider text-amber-800 underline hover:text-amber-950"
+            >
+              Filter Pending Only &rarr;
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => setStatusFilter("all")}
+          className={`px-3 py-1.5 text-[0.75rem] font-semibold uppercase tracking-wider border transition-colors ${
+            statusFilter === "all"
+              ? "border-foreground bg-foreground text-background"
+              : "border-rule text-ink-soft hover:bg-secondary"
+          }`}
+        >
+          All ({authors.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter("pending")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[0.75rem] font-semibold uppercase tracking-wider border transition-colors ${
+            statusFilter === "pending"
+              ? "border-amber-600 bg-amber-600 text-white"
+              : pendingAuthors.length > 0
+              ? "border-amber-500/40 text-amber-700 bg-amber-500/10 hover:bg-amber-500/20"
+              : "border-rule text-ink-soft hover:bg-secondary"
+          }`}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Pending ({pendingAuthors.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter("approved")}
+          className={`px-3 py-1.5 text-[0.75rem] font-semibold uppercase tracking-wider border transition-colors ${
+            statusFilter === "approved"
+              ? "border-foreground bg-foreground text-background"
+              : "border-rule text-ink-soft hover:bg-secondary"
+          }`}
+        >
+          Approved ({approvedAuthors.length})
+        </button>
+      </div>
+
       <div className="border border-rule overflow-x-auto">
-        <table className="w-full text-left text-[0.9rem] min-w-[650px]">
+        <table className="w-full text-left text-[0.9rem] min-w-[700px]">
           <thead className="bg-secondary/50 border-b border-rule">
             <tr>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Author</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Role</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Status</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Contact</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
-            {authors.map((author) => (
-              <tr key={author.id} className="hover:bg-secondary/20">
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-foreground">{author.full_name || "Author"}</div>
-                  <div className="text-[0.8rem] text-ink-soft">{author.email}</div>
-                </td>
-                <td className="py-4 px-4">
-                  <span
-                    className={`inline-block px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border ${
-                      author.role === "admin"
-                        ? "border-brand text-brand bg-brand/5"
-                        : "border-rule text-ink-soft"
-                    }`}
-                  >
-                    {author.role}
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-ink-soft text-[0.82rem]">
-                  {author.phone && <div>{author.phone}</div>}
-                  {author.city && <div className="text-[0.75rem] text-ink-soft/80">{author.city}</div>}
-                  {!author.phone && !author.city && <span className="text-ink-soft/50">—</span>}
-                </td>
-                <td className="py-4 px-4 text-right">
-                  <button
-                    onClick={() => {
-                      setErrorMsg("");
-                      setEditingAuthor({ ...author });
-                    }}
-                    className="text-[0.8rem] font-semibold text-foreground hover:text-brand mr-4"
-                  >
-                    Edit Details
-                  </button>
-                  {author.role !== "admin" && (
-                    <button
-                      onClick={() => handleRemoveAuthor(author)}
-                      className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700"
+            {filteredAuthors.map((author) => {
+              const isAppr = author.email === "forbesclone09@gmail.com" || author.is_approved;
+              return (
+                <tr key={author.id} className="hover:bg-secondary/20">
+                  <td className="py-4 px-4">
+                    <div className="font-semibold text-foreground">{author.full_name || "Author"}</div>
+                    <div className="text-[0.8rem] text-ink-soft">{author.email}</div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span
+                      className={`inline-block px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border ${
+                        author.role === "admin"
+                          ? "border-brand text-brand bg-brand/5"
+                          : "border-rule text-ink-soft"
+                      }`}
                     >
-                      Remove
+                      {author.role}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    {isAppr ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border border-emerald-500/30 text-emerald-700 bg-emerald-500/10">
+                        <Check className="h-3 w-3" /> Approved
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border border-amber-500/40 text-amber-700 bg-amber-500/15">
+                        <Clock className="h-3 w-3" /> Pending Review
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4 px-4 text-ink-soft text-[0.82rem]">
+                    {author.phone && <div>{author.phone}</div>}
+                    {author.city && <div className="text-[0.75rem] text-ink-soft/80">{author.city}</div>}
+                    {!author.phone && !author.city && <span className="text-ink-soft/50">—</span>}
+                  </td>
+                  <td className="py-4 px-4 text-right whitespace-nowrap">
+                    {author.email !== "forbesclone09@gmail.com" && !isAppr && (
+                      <button
+                        onClick={() => handleApproveAuthor(author)}
+                        className="bg-emerald-600 text-white px-3 py-1 text-[0.75rem] font-semibold uppercase hover:bg-emerald-700 mr-3 transition-colors"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {author.email !== "forbesclone09@gmail.com" && isAppr && (
+                      <button
+                        onClick={() => handleRevokeAuthor(author)}
+                        className="text-[0.75rem] font-semibold text-amber-700 hover:text-amber-900 hover:underline mr-3"
+                      >
+                        Suspend
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setErrorMsg("");
+                        setEditingAuthor({ ...author });
+                      }}
+                      className="text-[0.8rem] font-semibold text-foreground hover:text-brand mr-3"
+                    >
+                      Edit Details
                     </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                    {author.role !== "admin" && author.email !== "forbesclone09@gmail.com" && (
+                      <button
+                        onClick={() => handleRemoveAuthor(author)}
+                        className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -657,7 +928,7 @@ function AuthorsManager({ session }: { session: any }) {
           <div className="w-full max-w-lg border border-rule bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-display text-[1.4rem] text-foreground">Edit Author Details</h3>
             <p className="mt-1 text-[0.85rem] text-ink-soft">
-              Update role, contact details, or profile information for {editingAuthor.email}.
+              Update role, approval status, contact details, or profile information for {editingAuthor.email}.
             </p>
 
             <form onSubmit={handleSaveAuthorEdit} className="mt-5 space-y-4">
@@ -681,6 +952,18 @@ function AuthorsManager({ session }: { session: any }) {
                   <option value="author">Author</option>
                   <option value="admin">Admin</option>
                   <option value="user">User</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Dashboard Access / Status</label>
+                <select
+                  value={editingAuthor.is_approved ? "true" : "false"}
+                  onChange={(e) => setEditingAuthor({ ...editingAuthor, is_approved: e.target.value === "true" })}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                >
+                  <option value="true">Approved (Active Dashboard Access)</option>
+                  <option value="false">Pending Approval (Restricted)</option>
                 </select>
               </div>
 

@@ -1,4 +1,4 @@
--- 1. Create profiles table
+-- 1. Create profiles table with is_approved column
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text NOT NULL,
@@ -9,9 +9,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   city text,
   bio text,
   avatar_url text,
+  is_approved boolean DEFAULT false NOT NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure column exists if table was previously created
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_approved boolean DEFAULT false NOT NULL;
 
 -- 2. Create is_admin helper function with SECURITY DEFINER to prevent RLS recursion
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -77,16 +81,18 @@ CREATE POLICY "Admins can manage user_roles"
   );
 
 -- 5. Backfill existing users from auth.users into profiles and user_roles
-INSERT INTO public.profiles (id, email, full_name, role)
+INSERT INTO public.profiles (id, email, full_name, role, is_approved)
 SELECT 
   id, 
   email, 
   COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
-  CASE WHEN email = 'forbesclone09@gmail.com' THEN 'admin' ELSE 'author' END
+  CASE WHEN email = 'forbesclone09@gmail.com' THEN 'admin' ELSE 'author' END,
+  CASE WHEN email IN ('forbesclone09@gmail.com', 'contacttaisirayath@gmail.com') THEN true ELSE false END
 FROM auth.users
 ON CONFLICT (id) DO UPDATE SET
   email = EXCLUDED.email,
-  role = CASE WHEN EXCLUDED.email = 'forbesclone09@gmail.com' THEN 'admin' ELSE profiles.role END;
+  role = CASE WHEN EXCLUDED.email = 'forbesclone09@gmail.com' THEN 'admin' ELSE profiles.role END,
+  is_approved = CASE WHEN EXCLUDED.email IN ('forbesclone09@gmail.com', 'contacttaisirayath@gmail.com') THEN true ELSE profiles.is_approved END;
 
 -- Ensure user_roles also has all current users
 INSERT INTO public.user_roles (user_id, role)
@@ -101,14 +107,18 @@ ON CONFLICT (user_id) DO UPDATE SET
 CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, role)
+  INSERT INTO public.profiles (id, email, full_name, role, is_approved)
   VALUES (
     new.id,
     new.email,
     COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-    CASE WHEN new.email = 'forbesclone09@gmail.com' THEN 'admin' ELSE 'author' END
+    CASE WHEN new.email = 'forbesclone09@gmail.com' THEN 'admin' ELSE 'author' END,
+    CASE WHEN new.email = 'forbesclone09@gmail.com' THEN true ELSE false END
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    role = CASE WHEN EXCLUDED.email = 'forbesclone09@gmail.com' THEN 'admin' ELSE profiles.role END,
+    is_approved = CASE WHEN EXCLUDED.email = 'forbesclone09@gmail.com' THEN true ELSE profiles.is_approved END;
 
   INSERT INTO public.user_roles (user_id, role)
   VALUES (

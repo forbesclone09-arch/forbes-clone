@@ -83,7 +83,7 @@ function SignupPage() {
       )}
       {done && !error && (
         <AuthNotice>
-          Account created! Check your email to confirm, or if email confirmation is disabled in Supabase, you can now <Link to="/login" className={authLinkClass}>Sign in</Link>.
+          Account created! Your author application is now awaiting administrator approval. Once approved, you can <Link to="/login" className={authLinkClass}>Sign in</Link> to access your contributor dashboard.
         </AuthNotice>
       )}
       <div className="mt-9 border-t border-rule pt-6 text-[0.88rem] text-ink-soft">
