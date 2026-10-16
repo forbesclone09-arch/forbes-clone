@@ -2,33 +2,56 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ArrowLeft, Clock } from "lucide-react";
 
 import { ArticleCard, CategoryKicker } from "@/components/article-card";
-import { siteName, type Author } from "@/data/content";
+import { allArticles, siteName, type Author } from "@/data/content";
+import { getBody } from "@/data/article-body";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/article/$slug")({
   staticData: { sitemap: true },
   loader: async ({ params }) => {
+    // 1. Check Supabase first
     const { data: row } = await supabase
       .from("articles")
       .select("*")
       .eq("slug", params.slug)
-      .single();
-      
-    if (!row) throw notFound();
+      .maybeSingle();
 
-    const article = {
-      slug: row.slug,
-      title: row.title,
-      deck: row.excerpt,
-      category: row.category,
-      author: { name: row.author, title: "Staff Writer" },
-      published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
-      readTime: parseInt(row.read_time) || 5,
-      image: row.image_url,
-      body: row.body // Array of paragraphs from DB
-    };
+    if (row) {
+      const article = {
+        slug: row.slug,
+        title: row.title,
+        deck: row.excerpt,
+        category: row.category,
+        author: { name: row.author, title: "Staff Writer" },
+        published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+        readTime: parseInt(row.read_time) || 5,
+        image: row.image_url,
+        body: row.body // Array of paragraphs from DB
+      };
+      return { article };
+    }
 
-    return { article };
+    // 2. Graceful fallback for built-in template articles
+    const staticArticle = allArticles.find((a) => a.slug === params.slug);
+    if (staticArticle) {
+      const fallback = getBody(staticArticle.category);
+      const article = {
+        slug: staticArticle.slug,
+        title: staticArticle.title,
+        deck: staticArticle.deck,
+        category: staticArticle.category,
+        author: staticArticle.author,
+        published: staticArticle.published,
+        readTime: staticArticle.readTime,
+        image: staticArticle.image,
+        body: fallback?.paragraphs
+          ? fallback.paragraphs.map((content) => ({ type: "paragraph", content }))
+          : [{ type: "paragraph", content: staticArticle.deck }],
+      };
+      return { article };
+    }
+
+    throw notFound();
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
