@@ -13,6 +13,16 @@ import {
   PenLine,
   Plus,
   Quote,
+  User,
+  Users,
+  MapPin,
+  Phone,
+  Mail,
+  Shield,
+  Check,
+  X,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 
 import { navCategories, siteName, type CategoryName } from "@/data/content";
@@ -95,7 +105,7 @@ function DashboardPage() {
     [articles],
   );
   const [filter, setFilter] = useState<"All" | Status>("All");
-  const [tab, setTab] = useState<"stories" | "editor" | "authors">("stories");
+  const [tab, setTab] = useState<"stories" | "editor" | "profile" | "authors">("stories");
   const [activeArticle, setActiveArticle] = useState<any>(null);
 
   const visible = rows.filter((r) => filter === "All" || r.status === filter);
@@ -117,10 +127,10 @@ function DashboardPage() {
   const dashboardTabs: any[] = [
     ["stories", "My stories", FileText],
     ["editor", "Editor", PenLine],
+    ["profile", "Profile", User],
   ];
-  if (role === "admin") {
-    // We import Users icon down below or we can just use another icon, wait we didn't import Users
-    dashboardTabs.push(["authors", "Authors", List]); 
+  if (role === "admin" || session?.user?.email === "forbesclone09@gmail.com") {
+    dashboardTabs.push(["authors", "Authors", Users]); 
   }
 
   return (
@@ -230,60 +240,604 @@ function DashboardPage() {
         </section>
       ) : tab === "editor" ? (
         <Editor initialArticle={activeArticle} onClose={handleEditorClose} session={session} />
+      ) : tab === "profile" ? (
+        <ProfileManager session={session} />
       ) : (
-        <AuthorsManager />
+        <AuthorsManager session={session} />
       )}
     </div>
   );
 }
 
-function AuthorsManager() {
-  const [authors, setAuthors] = useState<any[]>([]);
+function ProfileManager({ session }: { session: any }) {
+  const [profile, setProfile] = useState({
+    full_name: "",
+    email: session?.user?.email || "",
+    phone: "",
+    address: "",
+    city: "",
+    bio: "",
+    role: "author",
+  });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    supabase.from('user_roles').select('*').then(({ data }) => {
-      setAuthors(data || []);
+    async function loadProfile() {
+      if (!session?.user?.id) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (data) {
+        setProfile({
+          full_name: data.full_name || "",
+          email: data.email || session.user.email || "",
+          phone: data.phone || "",
+          address: data.address || "",
+          city: data.city || "",
+          bio: data.bio || "",
+          role: data.role || "author",
+        });
+      } else {
+        setProfile((prev) => ({
+          ...prev,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "",
+        }));
+      }
       setLoading(false);
+    }
+    loadProfile();
+  }, [session]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+
+    const { error } = await supabase.from("profiles").upsert({
+      id: session.user.id,
+      email: session.user.email,
+      full_name: profile.full_name,
+      phone: profile.phone,
+      address: profile.address,
+      city: profile.city,
+      bio: profile.bio,
+      role: profile.role,
+      updated_at: new Date().toISOString(),
     });
+
+    setSaving(false);
+    if (error) {
+      setMessage({ text: `Failed to save: ${error.message}`, type: "error" });
+    } else {
+      setMessage({ text: "Profile details updated successfully!", type: "success" });
+      setTimeout(() => setMessage(null), 3500);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-ink-soft">Loading profile...</div>;
+
+  return (
+    <section className="mt-8 max-w-3xl">
+      <div className="border-b border-rule pb-5">
+        <h2 className="headline text-[1.8rem]">Author Profile</h2>
+        <p className="mt-1 text-[0.9rem] text-ink-soft">
+          Manage your personal details, public bio, and contact information.
+        </p>
+      </div>
+
+      <form onSubmit={handleSave} className="mt-8 space-y-6">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+              Full Name
+            </label>
+            <input
+              type="text"
+              required
+              value={profile.full_name}
+              onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+              placeholder="e.g. Alex Weber"
+              className="mt-2 w-full border border-rule bg-background px-3.5 py-2.5 text-[0.95rem] outline-none focus:border-foreground"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+              Email Address
+            </label>
+            <input
+              type="email"
+              disabled
+              value={profile.email}
+              className="mt-2 w-full border border-rule bg-secondary/30 px-3.5 py-2.5 text-[0.95rem] text-ink-soft outline-none cursor-not-allowed"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              placeholder="e.g. +49 151 23456789"
+              className="mt-2 w-full border border-rule bg-background px-3.5 py-2.5 text-[0.95rem] outline-none focus:border-foreground"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+              City / Country
+            </label>
+            <input
+              type="text"
+              value={profile.city}
+              onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+              placeholder="e.g. Berlin, Germany"
+              className="mt-2 w-full border border-rule bg-background px-3.5 py-2.5 text-[0.95rem] outline-none focus:border-foreground"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+            Street Address
+          </label>
+          <input
+            type="text"
+            value={profile.address}
+            onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+            placeholder="e.g. Friedrichstraße 45, 10117"
+            className="mt-2 w-full border border-rule bg-background px-3.5 py-2.5 text-[0.95rem] outline-none focus:border-foreground"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[0.8rem] font-semibold uppercase tracking-wider text-ink-soft">
+            Bio / Contributor Note
+          </label>
+          <textarea
+            rows={4}
+            value={profile.bio}
+            onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+            placeholder="Write a short biography that appears on your published stories..."
+            className="mt-2 w-full border border-rule bg-background p-3.5 text-[0.95rem] leading-relaxed outline-none focus:border-foreground"
+          />
+        </div>
+
+        {message && (
+          <div
+            className={`p-3 text-[0.85rem] font-medium border ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : "bg-red-50 text-red-800 border-red-200"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-foreground px-6 py-3 text-[0.8rem] font-semibold uppercase tracking-wider text-background hover:bg-brand disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function AuthorsManager({ session }: { session: any }) {
+  const [authors, setAuthors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingAuthor, setEditingAuthor] = useState<any>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newAuthor, setNewAuthor] = useState({
+    email: "",
+    full_name: "",
+    role: "author",
+    phone: "",
+    address: "",
+    city: "",
+    bio: "",
+  });
+  const [modalSaving, setModalSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const loadAuthors = async () => {
+    setLoading(true);
+    // 1. Try querying profiles
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    // 2. Query user_roles as well to make sure we don't miss anyone
+    const { data: rolesData } = await supabase.from("user_roles").select("*");
+
+    if (profilesData && profilesData.length > 0) {
+      const profileUserIds = new Set(profilesData.map((p: any) => p.id));
+      const extraAuthors = (rolesData || [])
+        .filter((r: any) => !profileUserIds.has(r.user_id))
+        .map((r: any) => ({
+          id: r.user_id,
+          email: r.user_id,
+          full_name: "Author",
+          role: r.role,
+        }));
+      setAuthors([...profilesData, ...extraAuthors]);
+    } else if (rolesData) {
+      setAuthors(
+        rolesData.map((r: any) => ({
+          id: r.user_id,
+          email: r.user_id,
+          full_name: "Author",
+          role: r.role,
+        }))
+      );
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAuthors();
   }, []);
 
-  if (loading) return <div className="mt-6 p-4">Loading authors...</div>;
+  const handleSaveAuthorEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAuthor) return;
+    setModalSaving(true);
+    setErrorMsg("");
+
+    const { error: profileError } = await supabase.from("profiles").upsert({
+      id: editingAuthor.id,
+      email: editingAuthor.email,
+      full_name: editingAuthor.full_name,
+      role: editingAuthor.role,
+      phone: editingAuthor.phone,
+      address: editingAuthor.address,
+      city: editingAuthor.city,
+      bio: editingAuthor.bio,
+      updated_at: new Date().toISOString(),
+    });
+
+    await supabase.from("user_roles").upsert({
+      user_id: editingAuthor.id,
+      role: editingAuthor.role,
+    });
+
+    setModalSaving(false);
+    if (profileError) {
+      setErrorMsg(profileError.message);
+    } else {
+      setEditingAuthor(null);
+      loadAuthors();
+    }
+  };
+
+  const handleAddAuthor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalSaving(true);
+    setErrorMsg("");
+
+    const newId = crypto.randomUUID();
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: newId,
+      email: newAuthor.email,
+      full_name: newAuthor.full_name,
+      role: newAuthor.role,
+      phone: newAuthor.phone,
+      address: newAuthor.address,
+      city: newAuthor.city,
+      bio: newAuthor.bio,
+    });
+
+    setModalSaving(false);
+    if (profileError) {
+      setErrorMsg(profileError.message);
+    } else {
+      setShowAddModal(false);
+      setNewAuthor({
+        email: "",
+        full_name: "",
+        role: "author",
+        phone: "",
+        address: "",
+        city: "",
+        bio: "",
+      });
+      loadAuthors();
+    }
+  };
+
+  const handleRemoveAuthor = async (author: any) => {
+    if (!confirm(`Are you sure you want to remove author ${author.full_name || author.email}?`)) {
+      return;
+    }
+    await supabase.from("profiles").delete().eq("id", author.id);
+    await supabase.from("user_roles").update({ role: "user" }).eq("user_id", author.id);
+    loadAuthors();
+  };
+
+  if (loading) return <div className="mt-6 p-4 text-ink-soft">Loading authors...</div>;
 
   return (
     <section className="mt-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="headline text-[1.8rem]">Manage Authors</h2>
-        <button className="bg-foreground text-background px-4 py-2 text-[0.8rem] font-semibold uppercase hover:bg-brand">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <div>
+          <h2 className="headline text-[1.8rem]">Manage Authors</h2>
+          <p className="mt-1 text-[0.85rem] text-ink-soft">
+            View, edit roles, contact details, and manage system authors.
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setErrorMsg("");
+            setShowAddModal(true);
+          }}
+          className="bg-foreground text-background px-4 py-2.5 text-[0.8rem] font-semibold uppercase hover:bg-brand transition-colors"
+        >
           + Add Author
         </button>
       </div>
-      <div className="border border-rule">
-        <table className="w-full text-left text-[0.9rem]">
+
+      <div className="border border-rule overflow-x-auto">
+        <table className="w-full text-left text-[0.9rem] min-w-[650px]">
           <thead className="bg-secondary/50 border-b border-rule">
             <tr>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Author</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Role</th>
-              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">ID</th>
+              <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem]">Contact</th>
               <th className="py-3 px-4 font-semibold text-ink-soft uppercase tracking-wider text-[0.75rem] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
             {authors.map((author) => (
               <tr key={author.id} className="hover:bg-secondary/20">
-                <td className="py-4 px-4 font-semibold text-foreground uppercase">{author.role}</td>
-                <td className="py-4 px-4 text-ink-soft">{author.user_id}</td>
+                <td className="py-4 px-4">
+                  <div className="font-semibold text-foreground">{author.full_name || "Author"}</div>
+                  <div className="text-[0.8rem] text-ink-soft">{author.email}</div>
+                </td>
+                <td className="py-4 px-4">
+                  <span
+                    className={`inline-block px-2.5 py-0.5 text-[0.72rem] font-bold uppercase tracking-wider border ${
+                      author.role === "admin"
+                        ? "border-brand text-brand bg-brand/5"
+                        : "border-rule text-ink-soft"
+                    }`}
+                  >
+                    {author.role}
+                  </span>
+                </td>
+                <td className="py-4 px-4 text-ink-soft text-[0.82rem]">
+                  {author.phone && <div>{author.phone}</div>}
+                  {author.city && <div className="text-[0.75rem] text-ink-soft/80">{author.city}</div>}
+                  {!author.phone && !author.city && <span className="text-ink-soft/50">—</span>}
+                </td>
                 <td className="py-4 px-4 text-right">
-                  <button className="text-[0.8rem] font-semibold hover:text-brand mr-4 text-ink-soft">Edit Details</button>
-                  <button className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700">Remove</button>
+                  <button
+                    onClick={() => {
+                      setErrorMsg("");
+                      setEditingAuthor({ ...author });
+                    }}
+                    className="text-[0.8rem] font-semibold text-foreground hover:text-brand mr-4"
+                  >
+                    Edit Details
+                  </button>
+                  {author.role !== "admin" && (
+                    <button
+                      onClick={() => handleRemoveAuthor(author)}
+                      className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-4 text-[0.8rem] text-ink-soft">
-        Note: Supabase requires Admin API access or server-side edge functions to securely reset user passwords or delete authentication accounts.
-      </p>
+
+      {/* Edit Details Modal */}
+      {editingAuthor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg border border-rule bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="font-display text-[1.4rem] text-foreground">Edit Author Details</h3>
+            <p className="mt-1 text-[0.85rem] text-ink-soft">
+              Update role, contact details, or profile information for {editingAuthor.email}.
+            </p>
+
+            <form onSubmit={handleSaveAuthorEdit} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Full Name</label>
+                <input
+                  type="text"
+                  value={editingAuthor.full_name || ""}
+                  onChange={(e) => setEditingAuthor({ ...editingAuthor, full_name: e.target.value })}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role</label>
+                <select
+                  value={editingAuthor.role || "author"}
+                  onChange={(e) => setEditingAuthor({ ...editingAuthor, role: e.target.value })}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                >
+                  <option value="author">Author</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">User</option>
+                </select>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editingAuthor.phone || ""}
+                    onChange={(e) => setEditingAuthor({ ...editingAuthor, phone: e.target.value })}
+                    className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">City / Country</label>
+                  <input
+                    type="text"
+                    value={editingAuthor.city || ""}
+                    onChange={(e) => setEditingAuthor({ ...editingAuthor, city: e.target.value })}
+                    className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Address</label>
+                <input
+                  type="text"
+                  value={editingAuthor.address || ""}
+                  onChange={(e) => setEditingAuthor({ ...editingAuthor, address: e.target.value })}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Bio</label>
+                <textarea
+                  rows={3}
+                  value={editingAuthor.bio || ""}
+                  onChange={(e) => setEditingAuthor({ ...editingAuthor, bio: e.target.value })}
+                  className="mt-1 w-full border border-rule bg-background p-2.5 text-[0.9rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              {errorMsg && <p className="text-red-500 text-xs">{errorMsg}</p>}
+
+              <div className="mt-6 flex justify-end gap-2 pt-2 border-t border-rule">
+                <button
+                  type="button"
+                  onClick={() => setEditingAuthor(null)}
+                  className="border border-rule px-4 py-2 text-[0.75rem] font-semibold uppercase hover:bg-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalSaving}
+                  className="bg-foreground px-4 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand disabled:opacity-50"
+                >
+                  {modalSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Author Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg border border-rule bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="font-display text-[1.4rem] text-foreground">Add New Author</h3>
+            <p className="mt-1 text-[0.85rem] text-ink-soft">
+              Create an author profile in the system.
+            </p>
+
+            <form onSubmit={handleAddAuthor} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Author Email*</label>
+                <input
+                  type="email"
+                  required
+                  value={newAuthor.email}
+                  onChange={(e) => setNewAuthor({ ...newAuthor, email: e.target.value })}
+                  placeholder="author@example.com"
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Full Name*</label>
+                <input
+                  type="text"
+                  required
+                  value={newAuthor.full_name}
+                  onChange={(e) => setNewAuthor({ ...newAuthor, full_name: e.target.value })}
+                  placeholder="Jane Doe"
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Role</label>
+                <select
+                  value={newAuthor.role}
+                  onChange={(e) => setNewAuthor({ ...newAuthor, role: e.target.value })}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                >
+                  <option value="author">Author</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">User</option>
+                </select>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={newAuthor.phone}
+                    onChange={(e) => setNewAuthor({ ...newAuthor, phone: e.target.value })}
+                    className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">City / Country</label>
+                  <input
+                    type="text"
+                    value={newAuthor.city}
+                    onChange={(e) => setNewAuthor({ ...newAuthor, city: e.target.value })}
+                    className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
+                  />
+                </div>
+              </div>
+
+              {errorMsg && <p className="text-red-500 text-xs">{errorMsg}</p>}
+
+              <div className="mt-6 flex justify-end gap-2 pt-2 border-t border-rule">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="border border-rule px-4 py-2 text-[0.75rem] font-semibold uppercase hover:bg-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalSaving}
+                  className="bg-foreground px-4 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand disabled:opacity-50"
+                >
+                  {modalSaving ? "Adding..." : "Add Author"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
