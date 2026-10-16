@@ -57,13 +57,18 @@ function LoginPage() {
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="grid h-7 w-7 shrink-0 place-items-center bg-foreground font-display text-[1.05rem] leading-none text-background"
+            className="grid h-7 w-7 shrink-0 place-items-center bg-foreground font-display text-[1.05rem] leading-none text-background font-bold"
           >
-            M
+            F
           </span>
-          <span className="font-display text-2xl leading-none font-semibold tracking-tight">
-            {siteName}
-          </span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-display text-2xl leading-none font-bold tracking-tight">
+              Forbes
+            </span>
+            <span className="font-sans text-[0.65rem] font-bold tracking-[0.2em] uppercase text-brand">
+              Germany
+            </span>
+          </div>
         </div>
 
         <h1 className="headline mt-8 text-[2.1rem] text-foreground sm:text-[2.5rem]">

@@ -69,11 +69,18 @@ export function AuthField({
   );
 }
 
-export function AuthSubmit({ children }: { children: ReactNode }) {
+export function AuthSubmit({
+  children,
+  disabled,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="submit"
-      className="w-full bg-foreground px-6 py-3.5 text-[0.82rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
+      disabled={disabled}
+      className="w-full bg-foreground px-6 py-3.5 text-[0.82rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {children}
     </button>
