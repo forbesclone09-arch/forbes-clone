@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Clock } from "lucide-react";
 
-import { Article } from "@/data/content";
+import { featuredArticle, type Article } from "@/data/content";
 
 // Full-bleed cover hero: edge-to-edge photo with the story text overlaid
 // on a bottom gradient, like a magazine cover.
-export function FeaturedHero({ article }: { article: Article }) {
-  if (!article) return null;
+export function FeaturedHero({ article }: { article?: Article } = {}) {
+  const active = article ?? featuredArticle;
+  if (!active) return null;
 
   return (
     <section
@@ -14,8 +15,8 @@ export function FeaturedHero({ article }: { article: Article }) {
       className="relative isolate h-[72vh] min-h-[540px] w-full overflow-hidden sm:h-[84vh] sm:min-h-[640px]"
     >
       <img
-        src={article.image}
-        alt={article.title}
+        src={active.image}
+        alt={active.title}
         width={1920}
         height={1088}
         fetchPriority="high"
@@ -38,7 +39,7 @@ export function FeaturedHero({ article }: { article: Article }) {
             <div className="flex items-center gap-3">
               <span className="kicker text-brand">Daily Cover</span>
               <span className="text-[0.72rem] tracking-[0.1em] text-hero-ink-soft uppercase">
-                {article.category}
+                {active.category}
               </span>
             </div>
 
@@ -48,37 +49,37 @@ export function FeaturedHero({ article }: { article: Article }) {
             >
               <Link
                 to="/article/$slug"
-                params={{ slug: article.slug }}
+                params={{ slug: active.slug }}
                 className="transition-colors hover:text-hero-ink-soft"
               >
-                {article.title}
+                {active.title}
               </Link>
             </h1>
 
             <p className="mt-4 max-w-2xl text-[0.95rem] leading-relaxed text-hero-ink-soft sm:text-[1.05rem]">
-              {article.deck}
+              {active.deck}
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-              <span className="font-semibold text-hero-ink">{article.author.name}</span>
+              <span className="font-semibold text-hero-ink">{active.author.name}</span>
               <span aria-hidden="true" className="text-hero-ink-soft">
                 &middot;
               </span>
-              <span className="text-hero-ink-soft">{article.author.title}</span>
+              <span className="text-hero-ink-soft">{active.author.title}</span>
               <span
                 aria-hidden="true"
                 className="hidden h-3 w-px bg-hero-ink-soft sm:block"
               />
               <span className="hidden text-[0.78rem] text-hero-ink-soft sm:inline">
-                {article.published}
+                {active.published}
               </span>
               <span className="inline-flex items-center gap-1.5 text-[0.78rem] text-hero-ink-soft">
                 <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                {article.readTime} min read
+                {active.readTime} min read
               </span>
               <Link
                 to="/article/$slug"
-                params={{ slug: article.slug }}
+                params={{ slug: active.slug }}
                 className="ml-auto inline-flex items-center gap-1.5 text-[0.78rem] font-semibold tracking-[0.08em] text-hero-ink uppercase underline-offset-4 hover:underline"
               >
                 Read the full story

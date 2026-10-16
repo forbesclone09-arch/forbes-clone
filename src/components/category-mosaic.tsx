@@ -33,10 +33,25 @@ function CompactStory({ article }: { article: Article }) {
   );
 }
 
-export function CategoryMosaic({ category }: { category: CategoryName }) {
-  const lead = categoryFeatures.find((article) => article.category === category);
+export function CategoryMosaic({ category, articles }: { category: CategoryName; articles?: Article[] }) {
+  const defaultLead = categoryFeatures.find((article) => article.category === category);
+  const defaultStories = articlesByCategory(category).filter((article) => article.slug !== defaultLead?.slug);
+
+  const categoryMatches = articles
+    ? articles.filter((a) => a.category?.toLowerCase() === category.toLowerCase())
+    : [];
+
+  const lead = categoryMatches[0] ?? defaultLead;
   if (!lead) return null;
-  const stories = articlesByCategory(category).filter((article) => article.slug !== lead.slug);
+
+  const remainingDynamic = categoryMatches.slice(1);
+  const stories = [
+    ...remainingDynamic,
+    ...defaultStories.filter(
+      (ds) => ds.slug !== lead.slug && !remainingDynamic.some((rd) => rd.slug === ds.slug)
+    ),
+  ];
+
   return (
     <section aria-label={`${category} stories`} className="mt-16 sm:mt-20">
       <div className="mb-6 flex items-center justify-between gap-4">

@@ -1,15 +1,25 @@
 import { Link } from "@tanstack/react-router";
 
 import { SectionHeading } from "@/components/article-card";
-import { mostRead } from "@/data/content";
+import { mostRead, type Article } from "@/data/content";
 
-export function MostRead() {
+export function MostRead({ articles }: { articles?: Article[] } = {}) {
+  const items = articles && articles.length > 0
+    ? articles.slice(0, 5).map((a, i) => ({
+        rank: i + 1,
+        slug: a.slug,
+        title: a.title,
+        category: a.category,
+        readTime: a.readTime,
+      }))
+    : mostRead;
+
   return (
     <aside aria-label="Most Read">
       <SectionHeading title="Most Read" />
 
       <ol className="divide-y divide-rule">
-        {mostRead.map((item) => (
+        {items.map((item) => (
           <li key={item.rank}>
             <Link
               to="/article/$slug"
