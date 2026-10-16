@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Bold,
@@ -29,6 +29,9 @@ import {
   AlertTriangle,
   RefreshCw,
   LogOut,
+  UploadCloud,
+  Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { navCategories, siteName, type CategoryName } from "@/data/content";
@@ -1135,23 +1138,177 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
     : "";
   const [content, setContent] = useState(initialBodyText);
   const [saved, setSaved] = useState("");
-  const tools = [Bold, Italic, Heading2, Quote, List, ListOrdered, Link2, ImagePlus];
+
+  // Cover image states
+  const [imageUrl, setImageUrl] = useState<string>(initialArticle?.image || "");
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
+  const [urlInput, setUrlInput] = useState<string>("");
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Inline body image modal states
+  const [showInlineImageModal, setShowInlineImageModal] = useState<boolean>(false);
+  const [inlineImageUrl, setInlineImageUrl] = useState<string>("");
+  const [inlineImageAlt, setInlineImageAlt] = useState<string>("");
+  const [inlineUploading, setInlineUploading] = useState<boolean>(false);
+
+  // Core image upload helper (Supabase storage with Base64 fallback)
+  const uploadImageFile = async (file: File): Promise<string> => {
+    if (!file || !file.type.startsWith("image/")) {
+      throw new Error("Please select a valid image file (JPEG, PNG, WebP, GIF).");
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const cleanFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const filePath = `articles/${cleanFileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('article-images')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+      if (!error && data) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('article-images')
+          .getPublicUrl(filePath);
+        return publicUrl;
+      }
+    } catch {
+      // Fall through to Base64 data URL
+    }
+
+    // Fallback: Read as data URL so authors are never blocked even without bucket setup
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to process image file."));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleCoverFile = async (file: File) => {
+    setIsUploading(true);
+    setUploadError("");
+    try {
+      const url = await uploadImageFile(file);
+      setImageUrl(url);
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to upload image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await handleCoverFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleApplyUrl = () => {
+    const trimmed = urlInput.trim();
+    if (trimmed) {
+      setImageUrl(trimmed);
+      setUrlInput("");
+    }
+  };
+
+  // Text formatting insertion helper
+  const insertFormatting = (before: string, after: string = "", placeholder: string = "") => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = content;
+    const selected = text.substring(start, end) || placeholder;
+    const replacement = `${before}${selected}${after}`;
+    const newContent = text.substring(0, start) + replacement + text.substring(end);
+    setContent(newContent);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+    }, 0);
+  };
+
+  const handleToolClick = (toolName: string) => {
+    switch (toolName) {
+      case "Bold":
+        insertFormatting("<b>", "</b>", "bold text");
+        break;
+      case "Italic":
+        insertFormatting("<i>", "</i>", "italic text");
+        break;
+      case "Heading2":
+        insertFormatting("\n\n<h2>", "</h2>\n\n", "Subheading");
+        break;
+      case "Quote":
+        insertFormatting("\n\n<blockquote>", "</blockquote>\n\n", "Notable quote text");
+        break;
+      case "List":
+        insertFormatting("\n\n<ul>\n  <li>", "</li>\n  <li>Second item</li>\n</ul>\n\n", "First item");
+        break;
+      case "ListOrdered":
+        insertFormatting("\n\n<ol>\n  <li>", "</li>\n  <li>Second step</li>\n</ol>\n\n", "Step one");
+        break;
+      case "Link2": {
+        const url = prompt("Enter hyperlink URL (e.g. https://...):");
+        if (url) {
+          insertFormatting(`<a href="${url}" target="_blank" rel="noopener noreferrer">`, "</a>", "link text");
+        }
+        break;
+      }
+      case "ImagePlus":
+        setShowInlineImageModal(true);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const tools = [
+    { name: "Bold", Icon: Bold, label: "Bold" },
+    { name: "Italic", Icon: Italic, label: "Italic" },
+    { name: "Heading2", Icon: Heading2, label: "Subheading" },
+    { name: "Quote", Icon: Quote, label: "Quote block" },
+    { name: "List", Icon: List, label: "Bulleted list" },
+    { name: "ListOrdered", Icon: ListOrdered, label: "Numbered list" },
+    { name: "Link2", Icon: Link2, label: "Insert link" },
+    { name: "ImagePlus", Icon: ImagePlus, label: "Insert image" },
+  ];
 
   const handleSave = async () => {
     setSaved("Saving...");
     const slug = initialArticle?.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const paragraphs = content.split("\n\n").map(p => ({ type: "paragraph", content: p }));
     
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    const readTimeCalc = `${Math.max(1, Math.round(wordCount / 200))} min read`;
+
     const articleData = {
       slug,
       title,
       excerpt,
       category,
       body: paragraphs,
-      image_url: initialArticle?.image || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80",
-      image_alt: "Article Image",
+      image_url: imageUrl || initialArticle?.image || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80",
+      image_alt: title || "Article Image",
       author: session?.user?.email?.split('@')[0] || "Unknown",
-      read_time: "5 min read",
+      read_time: readTimeCalc,
       published_at: initialArticle?.published_at || new Date().toISOString(),
       is_premium: false
     };
@@ -1189,7 +1346,7 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
   };
 
   return (
-    <section className="mt-6 grid gap-8 lg:grid-cols-[1fr_300px]">
+    <section className="mt-6 grid gap-8 lg:grid-cols-[1fr_320px]">
       <div>
         <input
           value={title}
@@ -1203,23 +1360,30 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
           placeholder="Standfirst — one or two sentences that sell the story"
           className="mt-4 w-full bg-transparent text-[1.05rem] text-ink-soft outline-none"
         />
-        <div className="mt-6 flex flex-wrap border border-rule">
-          {tools.map((Icon, i) => (
+        
+        {/* Formatting Toolbar */}
+        <div className="mt-6 flex flex-wrap border border-rule bg-secondary/20">
+          {tools.map(({ name, Icon, label }) => (
             <button
-              key={i}
+              key={name}
               type="button"
-              aria-label="Formatting tool"
-              className="grid h-10 w-10 place-items-center border-r border-rule text-ink-soft hover:bg-secondary hover:text-foreground"
+              title={label}
+              aria-label={label}
+              onClick={() => handleToolClick(name)}
+              className="grid h-10 w-10 place-items-center border-r border-rule text-ink-soft hover:bg-secondary hover:text-foreground transition-colors"
             >
               <Icon className="h-4 w-4" />
             </button>
           ))}
         </div>
+
+        {/* Text Area */}
         <textarea
+          ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Start writing your story... (separate paragraphs by pressing Enter twice) Supports HTML."
-          className="min-h-[360px] w-full resize-y border border-t-0 border-rule bg-transparent p-5 text-[1.02rem] leading-relaxed outline-none focus:border-foreground"
+          placeholder="Start writing your story... (separate paragraphs by pressing Enter twice) Supports HTML formatting and embedded images."
+          className="min-h-[420px] w-full resize-y border border-t-0 border-rule bg-transparent p-5 text-[1.02rem] leading-relaxed outline-none focus:border-foreground"
         />
       </div>
 
@@ -1304,15 +1468,216 @@ function Editor({ initialArticle, onClose, session }: { initialArticle: any, onC
             </div>
           </div>
         )}
+
+        {/* Cover Image Section */}
         <div className="border-t border-rule pt-4">
-          <p className="kicker">Cover image</p>
-          <div className="mt-3 grid aspect-[4/3] place-items-center border border-dashed border-rule text-[0.8rem] text-ink-soft">
-            <span className="inline-flex items-center gap-2">
-              <ImagePlus className="h-4 w-4" /> Drop an image
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <p className="kicker">Cover image</p>
+            <div className="flex text-[0.7rem] font-semibold uppercase">
+              <button
+                type="button"
+                onClick={() => setUploadMode("file")}
+                className={`px-2 py-0.5 border border-r-0 ${uploadMode === "file" ? "bg-foreground text-background" : "border-rule text-ink-soft hover:bg-secondary"}`}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadMode("url")}
+                className={`px-2 py-0.5 border ${uploadMode === "url" ? "bg-foreground text-background" : "border-rule text-ink-soft hover:bg-secondary"}`}
+              >
+                URL
+              </button>
+            </div>
           </div>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                handleCoverFile(e.target.files[0]);
+              }
+            }}
+            accept="image/*"
+            className="hidden"
+          />
+
+          {imageUrl ? (
+            <div className="relative group border border-rule overflow-hidden">
+              <img
+                src={imageUrl}
+                alt="Cover Preview"
+                className="w-full aspect-[4/3] object-cover"
+              />
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-white text-black px-3 py-1.5 text-xs font-semibold uppercase hover:bg-gray-100 transition-colors"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("")}
+                  className="bg-red-600 text-white px-3 py-1.5 text-xs font-semibold uppercase hover:bg-red-700 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : uploadMode === "file" ? (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`mt-2 grid aspect-[4/3] cursor-pointer place-items-center border-2 border-dashed p-4 text-center transition-colors ${
+                isDragging
+                  ? "border-brand bg-brand/5"
+                  : "border-rule text-ink-soft hover:border-foreground hover:bg-secondary/40"
+              }`}
+            >
+              {isUploading ? (
+                <div className="flex flex-col items-center gap-2 text-ink-soft">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                  <span className="text-xs font-medium">Uploading image...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="p-3 bg-secondary rounded-full">
+                    <UploadCloud className="h-6 w-6 text-foreground" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">
+                    Click to upload or drag & drop
+                  </span>
+                  <span className="text-[0.7rem] text-ink-soft">
+                    PNG, JPG, WebP, GIF up to 10MB
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <input
+                type="url"
+                placeholder="https://images.unsplash.com/..."
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="w-full border border-rule bg-background px-3 py-2 text-[0.85rem] outline-none focus:border-foreground"
+              />
+              <button
+                type="button"
+                onClick={handleApplyUrl}
+                disabled={!urlInput.trim()}
+                className="w-full bg-foreground text-background py-1.5 text-xs font-semibold uppercase hover:bg-brand disabled:opacity-50"
+              >
+                Apply Image URL
+              </button>
+            </div>
+          )}
+
+          {uploadError && (
+            <p className="mt-2 text-xs text-red-500">{uploadError}</p>
+          )}
         </div>
       </aside>
+
+      {/* Inline Image Modal */}
+      {showInlineImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md border border-rule bg-background p-6 shadow-xl">
+            <h3 className="font-display text-[1.3rem] text-foreground">Insert Image into Article</h3>
+            <p className="mt-1 text-[0.82rem] text-ink-soft">Upload an image file or paste an image link to embed in your text.</p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Upload Image File</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setInlineUploading(true);
+                      try {
+                        const url = await uploadImageFile(e.target.files[0]);
+                        setInlineImageUrl(url);
+                      } catch (err: any) {
+                        alert(err.message);
+                      } finally {
+                        setInlineUploading(false);
+                      }
+                    }
+                  }}
+                  className="mt-1 w-full text-xs text-ink-soft file:mr-3 file:py-1.5 file:px-3 file:border file:border-rule file:text-xs file:font-semibold file:bg-secondary file:cursor-pointer hover:file:bg-foreground hover:file:text-background"
+                />
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-rule"></div>
+                <span className="flex-shrink mx-2 text-xs text-ink-soft uppercase font-semibold">Or Image URL</span>
+                <div className="flex-grow border-t border-rule"></div>
+              </div>
+
+              <div>
+                <input
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={inlineImageUrl}
+                  onChange={(e) => setInlineImageUrl(e.target.value)}
+                  className="w-full border border-rule bg-background px-3 py-2 text-[0.85rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Caption / Alt Text (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Photo description or credit"
+                  value={inlineImageAlt}
+                  onChange={(e) => setInlineImageAlt(e.target.value)}
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.85rem] outline-none focus:border-foreground"
+                />
+              </div>
+
+              {inlineImageUrl && (
+                <div className="border border-rule p-2 bg-secondary/30">
+                  <img src={inlineImageUrl} alt="" className="max-h-36 mx-auto object-cover rounded" />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-rule">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInlineImageModal(false);
+                    setInlineImageUrl("");
+                    setInlineImageAlt("");
+                  }}
+                  className="border border-rule px-4 py-2 text-[0.75rem] font-semibold uppercase hover:bg-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!inlineImageUrl || inlineUploading}
+                  onClick={() => {
+                    const imgTag = `\n\n<figure class="my-6">\n  <img src="${inlineImageUrl}" alt="${inlineImageAlt}" class="w-full h-auto rounded" />\n  ${inlineImageAlt ? `<figcaption class="text-xs text-center text-gray-500 mt-2 italic">${inlineImageAlt}</figcaption>` : ''}\n</figure>\n\n`;
+                    insertFormatting(imgTag, "", "");
+                    setShowInlineImageModal(false);
+                    setInlineImageUrl("");
+                    setInlineImageAlt("");
+                  }}
+                  className="bg-foreground px-4 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand disabled:opacity-50"
+                >
+                  {inlineUploading ? "Uploading..." : "Insert Image"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
