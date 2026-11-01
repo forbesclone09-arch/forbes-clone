@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowRight, Bell, ChevronDown, Menu, Search, Settings2, X, LayoutDashboard, LogOut } from "lucide-react";
 
 import { allArticles, briefingItems, featuredArticle, mostRead, navCategories, recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
@@ -25,6 +25,8 @@ function Wordmark() {
 
 export function SiteHeader() {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isDashboard = Boolean(pathname?.startsWith("/dashboard"));
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountTab, setAccountTab] = useState<"account" | "notifications" | "settings">("account");
@@ -130,7 +132,7 @@ export function SiteHeader() {
             {menuOpen ? <X /> : <Menu />}
           </Button>
           <nav className="hidden items-center gap-5 lg:flex" aria-label="Categories">
-            {navCategories.map((category) => (
+            {!isDashboard && navCategories.map((category) => (
               <Link key={category} to="/category/$category" params={{ category: category.toLowerCase() }} onClick={closeMenu} className="text-[0.7rem] font-semibold uppercase text-background/80 hover:text-background">{category}</Link>
             ))}
           </nav>
@@ -138,9 +140,9 @@ export function SiteHeader() {
           <div className="justify-self-center text-background"><Wordmark /></div>
 
           <div className="flex items-center gap-2 justify-self-end sm:gap-5">
-            {!session && <Link to="/signup" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Sign up</Link>}
-            {!session && <Link to="/contact" onClick={() => setAccountOpen(false)} className="hidden bg-brand px-4 py-2.5 text-[0.78rem] font-semibold text-brand-foreground hover:bg-brand/85 sm:inline-flex">Subscribe</Link>}
-            {session && <Link to="/dashboard" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Dashboard</Link>}
+            {!isDashboard && !session && <Link to="/signup" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Sign up</Link>}
+            {!isDashboard && !session && <Link to="/contact" onClick={() => setAccountOpen(false)} className="hidden bg-brand px-4 py-2.5 text-[0.78rem] font-semibold text-brand-foreground hover:bg-brand/85 sm:inline-flex">Subscribe</Link>}
+            {!isDashboard && session && <Link to="/dashboard" onClick={() => setAccountOpen(false)} className="hidden text-[0.78rem] font-semibold text-background/85 hover:text-background lg:inline-flex">Dashboard</Link>}
             <Button type="button" variant="ghost" onClick={() => { closeMenu(); setAccountOpen((open) => !open); }} aria-expanded={accountOpen} aria-controls="account-panel" aria-label="Open account panel" className="h-9 gap-2 rounded-full border border-background/20 bg-background/10 px-2 text-background hover:bg-background/20 hover:text-background">
               <span className="grid size-6 place-items-center rounded-full bg-foreground font-display text-base font-semibold text-background ring-1 ring-background/40">{session ? session.user.email?.[0].toUpperCase() : 'F'}</span><ChevronDown className="size-3" aria-hidden="true" />
             </Button>
@@ -149,7 +151,7 @@ export function SiteHeader() {
       </div>
       </div>
 
-      {!menuOpen && <div className="border-t border-rule bg-paper">
+      {!menuOpen && !isDashboard && <div className="border-t border-rule bg-paper">
         <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-1.5 px-5 py-2.5 sm:flex-row sm:gap-12 sm:px-8">
           {briefingItems.map((item) => (
             <Link
@@ -186,7 +188,7 @@ export function SiteHeader() {
                 <Link to="/about" onClick={closeMenu} className="hover:text-brand">About Us</Link>
                 <Link to="/contact" onClick={closeMenu} className="hover:text-brand">Contact</Link>
                 <Link to="/privacy" onClick={closeMenu} className="hover:text-brand">Privacy Policy</Link>
-                {!session && <Link to="/signup" onClick={closeMenu} className="hover:text-brand">Sign up</Link>}
+                {!isDashboard && !session && <Link to="/signup" onClick={closeMenu} className="hover:text-brand">Sign up</Link>}
               </div>
             </div>
 

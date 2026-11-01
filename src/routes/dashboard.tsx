@@ -277,46 +277,53 @@ function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-5 py-10 sm:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-foreground pb-5">
-        <div>
+    <div className="mx-auto w-full max-w-[1240px] px-4 sm:px-8 py-6 sm:py-10">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-foreground pb-5">
+        <div className="min-w-0">
           <p className="kicker">Author dashboard {isAdmin && <span className="text-brand ml-2">(Admin Access)</span>}</p>
-          <h1 className="headline mt-2 text-[2rem] sm:text-[2.4rem]">Welcome back, {userFullName || session?.user?.email}</h1>
+          <h1 className="headline mt-2 text-[1.75rem] sm:text-[2.4rem] break-words">Welcome back, {userFullName || session?.user?.email}</h1>
         </div>
-        <div className="flex gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           <button
             onClick={async () => {
               await supabase.auth.signOut();
               navigate({ to: "/login" });
             }}
-            className="text-[0.78rem] font-semibold tracking-[0.08em] text-ink-soft hover:text-foreground uppercase"
+            className="text-[0.78rem] font-semibold tracking-[0.08em] text-ink-soft hover:text-foreground uppercase py-2"
           >
             Sign out
           </button>
           <button
             onClick={() => openEditor()}
-            className="inline-flex items-center gap-2 bg-foreground px-5 py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
+            className="inline-flex items-center gap-2 bg-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
           >
             <Plus className="h-4 w-4" /> New story
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 border-b border-rule lg:grid-cols-4">
+      <div className="grid grid-cols-2 border-b border-rule sm:grid-cols-4">
         {[
           ["Published", displayedStats.filter((r) => r.status === "Published").length],
           ["In review", displayedStats.filter((r) => r.status === "In review").length],
           ["Drafts", displayedStats.filter((r) => r.status === "Draft").length],
           ["Total views", displayedViews.toLocaleString()],
-        ].map(([label, value]) => (
-          <div key={label} className="border-rule py-6 pr-4 odd:border-r lg:border-r lg:last:border-r-0 lg:px-6 lg:first:pl-0">
-            <p className="kicker text-ink-soft">{tab === "my_stories" ? `My ${label}` : label}</p>
-            <p className="mt-2 font-display text-[2rem] leading-none">{value}</p>
+        ].map(([label, value], idx) => (
+          <div
+            key={label}
+            className={`py-4 sm:py-6 px-3.5 sm:px-6 ${
+              idx % 2 === 0 ? "border-r border-rule sm:border-r-0" : ""
+            } sm:border-r sm:last:border-r-0 ${
+              idx >= 2 ? "border-t border-rule sm:border-t-0" : ""
+            }`}
+          >
+            <p className="kicker text-ink-soft text-[0.68rem] sm:text-xs truncate">{tab === "my_stories" ? `My ${label}` : label}</p>
+            <p className="mt-1.5 sm:mt-2 font-display text-[1.65rem] sm:text-[2rem] leading-none tracking-tight">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-8 flex gap-6 border-b border-rule overflow-x-auto">
+      <div className="mt-6 sm:mt-8 -mx-4 px-4 sm:mx-0 sm:px-0 flex gap-4 sm:gap-6 border-b border-rule overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none]">
         {dashboardTabs.map(([key, label, Icon, badgeCount, badgeType]) => (
           <button
             key={key}
@@ -328,7 +335,7 @@ function DashboardPage() {
                 setTab(key as any);
               }
             }}
-            className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold whitespace-nowrap transition-colors ${
+            className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold whitespace-nowrap transition-colors shrink-0 ${
               tab === key ? "border-brand text-foreground" : "border-transparent text-ink-soft hover:text-foreground"
             }`}
           >
@@ -368,15 +375,15 @@ function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
                 <Search className="h-3.5 w-3.5 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search stories..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-[0.8rem] border border-rule bg-background focus:border-foreground outline-none w-48 sm:w-60"
+                  className="pl-8 pr-3 py-1.5 text-[0.8rem] border border-rule bg-background focus:border-foreground outline-none w-full sm:w-60"
                 />
               </div>
             </div>
@@ -427,60 +434,75 @@ function DashboardPage() {
               {visible.map(({ article, status, views, isOwner }) => {
                 const canEdit = isAdmin || isOwner;
                 return (
-                  <li key={article.slug} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
-                    <img src={article.image} alt="" className="h-16 w-24 shrink-0 object-cover" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="kicker">{article.category}</p>
-                        {isOwner && (
-                          <span className="border border-blue-500/30 bg-blue-500/10 text-blue-700 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider">
-                            Your Story
-                          </span>
-                        )}
-                      </div>
-                      <Link
-                        to="/article/$slug"
-                        params={{ slug: article.slug }}
-                        className="mt-1 block font-display text-[1.1rem] leading-snug hover:text-brand"
-                      >
-                        {article.title}
-                      </Link>
-                      <p className="mt-1 text-[0.8rem] text-ink-soft">
-                        <span className="font-medium text-foreground">{article.author.name}</span> · {article.published} · {article.readTime} min read
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-4 text-[0.8rem]">
-                      <span
-                        className={`border px-2 py-1 font-semibold text-[0.75rem] ${
-                          status === "Published" ? "border-foreground" : status === "In review" ? "border-brand text-brand" : "border-rule text-ink-soft"
-                        }`}
-                      >
-                        {status}
-                      </span>
-                      <span className="inline-flex w-20 items-center gap-1 text-ink-soft">
-                        <Eye className="h-3.5 w-3.5" /> {views ? views.toLocaleString() : "—"}
-                      </span>
-                      {canEdit ? (
-                        <button
-                          onClick={() => openEditor(article)}
-                          className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-brand px-3 py-1 border border-rule hover:border-foreground transition-colors"
-                        >
-                          <Edit2 className="h-3 w-3" /> Edit
-                        </button>
-                      ) : (
-                        <div className="inline-flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-[0.75rem] text-ink-soft/70">
-                            <Lock className="h-3 w-3" /> Read-only
-                          </span>
+                  <li key={article.slug} className="py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                      <div className="flex items-start gap-3 sm:contents">
+                        <img
+                          src={article.image}
+                          alt=""
+                          className="h-16 w-20 sm:h-16 sm:w-24 shrink-0 object-cover bg-secondary"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="kicker">{article.category}</p>
+                            {isOwner && (
+                              <span className="border border-blue-500/30 bg-blue-500/10 text-blue-700 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider">
+                                Your Story
+                              </span>
+                            )}
+                          </div>
                           <Link
                             to="/article/$slug"
                             params={{ slug: article.slug }}
-                            className="text-[0.78rem] font-semibold text-ink-soft hover:text-foreground underline"
+                            className="mt-1 block font-display text-[1.05rem] sm:text-[1.1rem] leading-snug hover:text-brand line-clamp-2"
                           >
-                            View
+                            {article.title}
                           </Link>
+                          <p className="mt-1 text-[0.76rem] sm:text-[0.8rem] text-ink-soft">
+                            <span className="font-medium text-foreground">{article.author.name}</span> · {article.published} · {article.readTime} min read
+                          </p>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center justify-between sm:justify-end gap-3 sm:gap-4 pt-2.5 sm:pt-0 border-t border-rule/50 sm:border-t-0 text-[0.8rem]">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`border px-2 py-0.5 sm:py-1 font-semibold text-[0.72rem] sm:text-[0.75rem] ${
+                              status === "Published"
+                                ? "border-foreground"
+                                : status === "In review"
+                                ? "border-brand text-brand"
+                                : "border-rule text-ink-soft"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-ink-soft text-[0.75rem] sm:text-[0.8rem]">
+                            <Eye className="h-3.5 w-3.5" /> {views ? views.toLocaleString() : "—"}
+                          </span>
+                        </div>
+                        {canEdit ? (
+                          <button
+                            onClick={() => openEditor(article)}
+                            className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-brand px-3 py-1 border border-rule hover:border-foreground transition-colors text-[0.78rem]"
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit
+                          </button>
+                        ) : (
+                          <div className="inline-flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 text-[0.72rem] sm:text-[0.75rem] text-ink-soft/70">
+                              <Lock className="h-3 w-3" /> Read-only
+                            </span>
+                            <Link
+                              to="/article/$slug"
+                              params={{ slug: article.slug }}
+                              className="text-[0.75rem] sm:text-[0.78rem] font-semibold text-ink-soft hover:text-foreground underline"
+                            >
+                              View
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </li>
                 );
