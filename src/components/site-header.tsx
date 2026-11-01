@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { ArrowRight, Bell, ChevronDown, Menu, Search, Settings2, X, LayoutDashboard, LogOut } from "lucide-react";
 
 import { allArticles, briefingItems, featuredArticle, mostRead, navCategories, recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
@@ -25,8 +25,8 @@ function Wordmark() {
 
 export function SiteHeader() {
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isDashboard = Boolean(pathname?.startsWith("/dashboard"));
+  const location = useLocation();
+  const isDashboard = location.pathname.startsWith("/dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountTab, setAccountTab] = useState<"account" | "notifications" | "settings">("account");
@@ -281,15 +281,15 @@ export function SiteHeader() {
                         {accountSection === section && <p className="pb-5 text-sm leading-relaxed text-background/65">{section === "For You" ? "Your personalized stories will appear here when you sign in." : section === "Newsletters" ? "Sign in to see the newsletters you follow." : "Sign in to see your saved stories."}</p>}
                       </div>
                     ))}
-                    <p className="mt-7 text-sm text-background/90">Already have an account? <Link to="/login" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Sign In</Link></p>
-                    <p className="mt-2 text-sm text-background/90">New contributor? <Link to="/signup" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Create an account</Link></p>
+                    <p className="mt-7 text-sm text-background/90">Follow curated desks and newsletters by subscribing below.</p>
+                    <p className="mt-2 text-sm text-background/90"><Link to="/contact" onClick={() => setAccountOpen(false)} className="font-semibold underline underline-offset-2 hover:text-brand">Subscribe to Newsletter</Link></p>
                   </>
                 )}
               </div>
             ) : accountTab === "notifications" ? (
-              <div className="pt-9"><Bell className="size-5 text-background/70" aria-hidden="true" /><h2 className="mt-4 text-base font-semibold">Notifications</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "You have no new notifications." : "Sign in to see your notifications."}</p>{!session && <Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link>}</div>
+              <div className="pt-9"><Bell className="size-5 text-background/70" aria-hidden="true" /><h2 className="mt-4 text-base font-semibold">Notifications</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "You have no new notifications." : "Subscribe to receive editorial alerts."}</p></div>
             ) : (
-              <div className="pt-9"><h2 className="text-base font-semibold">Account settings</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "Manage your account preferences here." : "Sign in to manage your account preferences."}</p>{!session && <Link to="/login" onClick={() => setAccountOpen(false)} className="mt-5 inline-block text-sm font-semibold underline underline-offset-2">Sign In</Link>}</div>
+              <div className="pt-9"><h2 className="text-base font-semibold">Account settings</h2><p className="mt-2 text-sm leading-relaxed text-background/65">{session ? "Manage your account preferences here." : "Subscriber preferences are available for newsletter members."}</p></div>
             )}
           </aside>
         </>

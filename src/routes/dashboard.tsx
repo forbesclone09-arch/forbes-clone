@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
 import {
   Bold,
   Eye,
@@ -19,6 +20,7 @@ import {
   Phone,
   Mail,
   Shield,
+  ShieldCheck,
   Check,
   X,
   Edit2,
@@ -41,6 +43,8 @@ import {
   FileCode,
   Sparkles,
   Copy,
+  ExternalLink,
+  KeyRound,
 } from "lucide-react";
 
 import { navCategories, siteName, type CategoryName } from "@/data/content";
@@ -80,7 +84,7 @@ function DashboardPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        navigate({ to: "/login" });
+        navigate({ to: "/privatelogin" });
       } else {
         setSession(session);
         fetchData(session.user.id, session.user.email);
@@ -255,6 +259,25 @@ function DashboardPage() {
     fetchData(session?.user?.id, session?.user?.email); // Refresh after edit
   };
 
+  const handleDeleteArticle = async (article: any) => {
+    if (!isAdmin && !isStoryOwner(article)) {
+      alert("Permission denied: You can only delete articles that you authored.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${article.title}"?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.from("articles").delete().eq("slug", article.slug);
+      if (error) throw error;
+      setArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+    } catch (err: any) {
+      alert(`Failed to delete article: ${err.message || "Unknown error"}`);
+    }
+  };
+
   if (loading) return <div className="p-10 text-center">Loading dashboard...</div>;
 
   if (!isApproved && !isAdmin) {
@@ -267,93 +290,165 @@ function DashboardPage() {
   }
 
   const dashboardTabs: [string, string, any, number?, string?][] = [
-    ["all_stories", "All stories", Globe, rows.length, "neutral"],
-    ["my_stories", "My stories", BookOpen, myRows.length, "neutral"],
-    ["editor", "Editor", PenLine],
-    ["profile", "Profile", User],
+    ["all_stories", "Newsroom Stories", Globe, rows.length, "neutral"],
+    ["my_stories", "My Stories", BookOpen, myRows.length, "neutral"],
+    ["editor", "Story Editor", PenLine],
+    ["profile", "Profile & Security", User],
   ];
   if (isAdmin) {
-    dashboardTabs.push(["authors", "Authors", Users, pendingCount, "warning"]); 
+    dashboardTabs.push(["authors", "Journalists & Team", Users, pendingCount, "warning"]); 
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-4 sm:px-8 py-6 sm:py-10">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-foreground pb-5">
-        <div className="min-w-0">
-          <p className="kicker">Author dashboard {isAdmin && <span className="text-brand ml-2">(Admin Access)</span>}</p>
-          <h1 className="headline mt-2 text-[1.75rem] sm:text-[2.4rem] break-words">Welcome back, {userFullName || session?.user?.email}</h1>
-        </div>
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate({ to: "/login" });
-            }}
-            className="text-[0.78rem] font-semibold tracking-[0.08em] text-ink-soft hover:text-foreground uppercase py-2"
-          >
-            Sign out
-          </button>
-          <button
-            onClick={() => openEditor()}
-            className="inline-flex items-center gap-2 bg-foreground px-4 sm:px-5 py-2.5 sm:py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
-          >
-            <Plus className="h-4 w-4" /> New story
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 border-b border-rule sm:grid-cols-4">
-        {[
-          ["Published", displayedStats.filter((r) => r.status === "Published").length],
-          ["In review", displayedStats.filter((r) => r.status === "In review").length],
-          ["Drafts", displayedStats.filter((r) => r.status === "Draft").length],
-          ["Total views", displayedViews.toLocaleString()],
-        ].map(([label, value], idx) => (
-          <div
-            key={label}
-            className={`py-4 sm:py-6 px-3.5 sm:px-6 ${
-              idx % 2 === 0 ? "border-r border-rule sm:border-r-0" : ""
-            } sm:border-r sm:last:border-r-0 ${
-              idx >= 2 ? "border-t border-rule sm:border-t-0" : ""
-            }`}
-          >
-            <p className="kicker text-ink-soft text-[0.68rem] sm:text-xs truncate">{tab === "my_stories" ? `My ${label}` : label}</p>
-            <p className="mt-1.5 sm:mt-2 font-display text-[1.65rem] sm:text-[2rem] leading-none tracking-tight">{value}</p>
+    <div className="min-h-screen bg-[#f8f9fa] text-foreground flex flex-col font-sans">
+      {/* Studio Back-Office Top Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-[#0c0d10] text-white border-b border-zinc-800 shadow-md">
+        <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-4 sm:px-8">
+          {/* Left: Brand + Studio Badge */}
+          <div className="flex items-center gap-3">
+            <span className="flex size-7 items-center justify-center bg-red-600 font-display font-black text-sm text-white rounded">
+              F
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-base font-bold tracking-tight text-white">Forbes Germany</span>
+              <span className="text-[0.62rem] font-mono uppercase tracking-[0.2em] text-zinc-400 border border-zinc-700/80 px-1.5 py-0.5 rounded">
+                Newsroom Studio
+              </span>
+            </div>
+            <div className="hidden sm:block">
+              {isAdmin ? (
+                <span className="bg-red-950/80 border border-red-500/50 text-red-300 font-mono text-[0.65rem] px-2 py-0.5 rounded uppercase tracking-wider font-semibold inline-flex items-center gap-1">
+                  <ShieldCheck className="size-3" /> Administrator
+                </span>
+              ) : (
+                <span className="bg-blue-950/80 border border-blue-500/50 text-blue-300 font-mono text-[0.65rem] px-2 py-0.5 rounded uppercase tracking-wider font-semibold inline-flex items-center gap-1">
+                  <User className="size-3" /> Staff Journalist
+                </span>
+              )}
+            </div>
           </div>
-        ))}
-      </div>
 
-      <div className="mt-6 sm:mt-8 -mx-4 px-4 sm:mx-0 sm:px-0 flex gap-4 sm:gap-6 border-b border-rule overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none]">
-        {dashboardTabs.map(([key, label, Icon, badgeCount, badgeType]) => (
-          <button
-            key={key}
-            onClick={() => {
-              if (key === "all_stories" || key === "my_stories") {
-                setTab(key as any);
-                setStoryTabMemory(key as any);
-              } else {
-                setTab(key as any);
-              }
-            }}
-            className={`-mb-px inline-flex items-center gap-2 border-b-2 pb-3 text-[0.88rem] font-semibold whitespace-nowrap transition-colors shrink-0 ${
-              tab === key ? "border-brand text-foreground" : "border-transparent text-ink-soft hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-4 w-4" /> {label}
-            {typeof badgeCount === "number" && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none ${
-                  badgeType === "warning" && badgeCount > 0
-                    ? "bg-amber-500 text-white"
-                    : "bg-secondary text-foreground border border-rule"
+          {/* Right: Actions */}
+          <div className="flex items-center gap-3 sm:gap-4 text-xs font-mono">
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded"
+              title="Open Public Portal in new tab"
+            >
+              <span>Public Portal</span>
+              <ExternalLink className="size-3" />
+            </a>
+
+            <div className="h-4 w-px bg-zinc-800" />
+
+            <div className="flex items-center gap-2">
+              <span className="size-7 rounded-full bg-red-600 text-white grid place-items-center font-bold text-xs ring-1 ring-white/20">
+                {(userFullName?.[0] || session?.user?.email?.[0] || "A").toUpperCase()}
+              </span>
+              <div className="hidden md:block text-left">
+                <div className="font-medium text-white truncate max-w-[130px] leading-tight">
+                  {userFullName || session?.user?.email?.split('@')[0]}
+                </div>
+                <div className="text-[0.62rem] text-zinc-400 capitalize">
+                  {role === "admin" ? "Admin Access" : "Journalist"}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/privatelogin" });
+              }}
+              className="inline-flex items-center gap-1 text-zinc-400 hover:text-red-400 transition-colors py-1 px-2 border border-zinc-800 hover:border-red-900/60 rounded"
+              title="Sign Out of Newsroom Studio"
+            >
+              <LogOut className="size-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Subnav Navigation */}
+      <div className="bg-white border-b border-rule shadow-xs">
+        <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-4 sm:px-8">
+          <nav className="flex gap-1 sm:gap-2 overflow-x-auto py-2.5 scrollbar-none">
+            {dashboardTabs.map(([key, label, Icon, badgeCount, badgeType]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  if (key === "all_stories" || key === "my_stories") {
+                    setTab(key as any);
+                    setStoryTabMemory(key as any);
+                  } else {
+                    setTab(key as any);
+                  }
+                }}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded transition-colors shrink-0 ${
+                  tab === key
+                    ? "bg-zinc-950 text-white shadow-sm"
+                    : "text-ink-soft hover:bg-zinc-100 hover:text-foreground"
                 }`}
               >
-                {badgeCount}
-              </span>
-            )}
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+                {typeof badgeCount === "number" && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none ${
+                      tab === key
+                        ? "bg-red-600 text-white"
+                        : badgeType === "warning" && badgeCount > 0
+                        ? "bg-amber-500 text-white"
+                        : "bg-zinc-200 text-foreground"
+                    }`}
+                  >
+                    {badgeCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <button
+            onClick={() => openEditor()}
+            className="hidden sm:inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-colors shrink-0 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" /> Compose Story
           </button>
-        ))}
+        </div>
       </div>
+
+      <main className="mx-auto w-full max-w-[1400px] px-4 sm:px-8 py-6 flex-1">
+        {(tab === "all_stories" || tab === "my_stories") && (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4 mb-6">
+            {[
+              ["Published", displayedStats.filter((r) => r.status === "Published").length, "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"],
+              ["In review", displayedStats.filter((r) => r.status === "In review").length, "bg-amber-500/10 text-amber-700 border-amber-500/20"],
+              ["Drafts", displayedStats.filter((r) => r.status === "Draft").length, "bg-zinc-100 text-zinc-700 border-zinc-200"],
+              ["Total views", displayedViews.toLocaleString(), "bg-blue-500/10 text-blue-700 border-blue-500/20"],
+            ].map(([label, value, badgeStyle]) => (
+              <div
+                key={label as string}
+                className="bg-white border border-rule p-4 sm:p-5 rounded-lg shadow-xs flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.72rem] sm:text-xs font-bold uppercase tracking-wider text-ink-soft">
+                    {tab === "my_stories" ? `My ${label}` : (label as string)}
+                  </span>
+                  <span className={`text-[0.62rem] font-bold px-2 py-0.5 rounded border uppercase ${badgeStyle}`}>
+                    {label as string}
+                  </span>
+                </div>
+                <p className="mt-2 font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                  {value as any}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
 
       {tab === "all_stories" || tab === "my_stories" ? (
         <section className="mt-6">
@@ -482,16 +577,26 @@ function DashboardPage() {
                           </span>
                         </div>
                         {canEdit ? (
-                          <button
-                            onClick={() => openEditor(article)}
-                            className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-brand px-3 py-1 border border-rule hover:border-foreground transition-colors text-[0.78rem]"
-                          >
-                            <Edit2 className="h-3 w-3" /> Edit
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => openEditor(article)}
+                              className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-brand px-2.5 py-1 border border-rule hover:border-foreground transition-colors text-[0.78rem]"
+                              title="Edit Story"
+                            >
+                              <Edit2 className="h-3 w-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteArticle(article)}
+                              className="inline-flex items-center gap-1 font-semibold text-red-600 hover:text-red-700 px-2 py-1 border border-red-200 hover:border-red-400 bg-red-50/60 hover:bg-red-50 transition-colors text-[0.78rem]"
+                              title="Delete Story"
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </button>
+                          </div>
                         ) : (
                           <div className="inline-flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 text-[0.72rem] sm:text-[0.75rem] text-ink-soft/70">
-                              <Lock className="h-3 w-3" /> Read-only
+                            <span className="inline-flex items-center gap-1 text-[0.72rem] sm:text-[0.75rem] text-zinc-600 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded font-medium">
+                              <Lock className="h-3 w-3 text-zinc-500" /> Protected (Other Author)
                             </span>
                             <Link
                               to="/article/$slug"
@@ -524,6 +629,7 @@ function DashboardPage() {
       ) : (
         <AuthorsManager session={session} onPendingChange={(c) => setPendingCount(c)} />
       )}
+      </main>
     </div>
   );
 }
@@ -780,7 +886,116 @@ function ProfileManager({ session }: { session: any }) {
           </button>
         </div>
       </form>
+
+      {/* Security & Password Management */}
+      <ChangePasswordCard />
     </section>
+  );
+}
+
+function ChangePasswordCard() {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setPwdMessage({ text: "Password must be at least 6 characters long.", type: "error" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdMessage({ text: "Passwords do not match.", type: "error" });
+      return;
+    }
+    setUpdating(true);
+    setPwdMessage(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPwdMessage({ text: "Password changed successfully! Keep your new credentials secure.", type: "success" });
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPwdMessage({ text: err.message || "Failed to update password.", type: "error" });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <div className="mt-12 border-t border-rule pt-8">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-brand" />
+        <h3 className="font-display text-[1.4rem] text-foreground">Security & Password</h3>
+      </div>
+      <p className="mt-1 text-[0.85rem] text-ink-soft">
+        Change your newsroom password at any time. You can use your updated credentials next time you access the secret portal.
+      </p>
+
+      <form onSubmit={handleUpdatePassword} className="mt-6 max-w-md space-y-4">
+        <div>
+          <label className="block text-[0.75rem] font-semibold uppercase tracking-wider text-ink-soft">
+            New Password
+          </label>
+          <div className="relative mt-1">
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              className="w-full border border-rule bg-background px-3.5 py-2 text-[0.9rem] outline-none focus:border-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft hover:text-foreground text-xs font-semibold"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[0.75rem] font-semibold uppercase tracking-wider text-ink-soft">
+            Confirm New Password
+          </label>
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            minLength={6}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter new password"
+            className="mt-1 w-full border border-rule bg-background px-3.5 py-2 text-[0.9rem] outline-none focus:border-foreground"
+          />
+        </div>
+
+        {pwdMessage && (
+          <div
+            className={`p-3 text-[0.85rem] font-medium border ${
+              pwdMessage.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : "bg-red-50 text-red-800 border-red-200"
+            }`}
+          >
+            {pwdMessage.text}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={updating || !newPassword}
+          className="bg-foreground px-5 py-2.5 text-[0.78rem] font-semibold uppercase tracking-wider text-background hover:bg-brand disabled:opacity-50 transition-colors"
+        >
+          {updating ? "Updating Password..." : "Update Password"}
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -794,8 +1009,15 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
   const [actionFeedback, setActionFeedback] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved">("all");
+  const [provisionedCredentials, setProvisionedCredentials] = useState<{
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+  } | null>(null);
   const [newAuthor, setNewAuthor] = useState({
     email: "",
+    password: "",
     full_name: "",
     role: "author",
     phone: "",
@@ -806,6 +1028,15 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
   });
   const [modalSaving, setModalSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const generatePassword = () => {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%";
+    let pwd = "";
+    for (let i = 0; i < 12; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewAuthor((prev) => ({ ...prev, password: pwd }));
+  };
 
   const loadAuthors = async () => {
     setLoading(true);
@@ -991,36 +1222,75 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
 
   const handleAddAuthor = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newAuthor.password || newAuthor.password.length < 6) {
+      setErrorMsg("Please provide an initial password of at least 6 characters.");
+      return;
+    }
     setModalSaving(true);
     setErrorMsg("");
 
-    const newId = crypto.randomUUID();
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: newId,
-      email: newAuthor.email,
-      full_name: newAuthor.full_name,
-      role: newAuthor.role,
-      phone: newAuthor.phone,
-      address: newAuthor.address,
-      city: newAuthor.city,
-      bio: newAuthor.bio,
-      is_approved: true, // admin added authors are approved by default
-    });
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://dzcrxsltiatmqhookcvr.supabase.co";
+      const supabaseAnonKey =
+        import.meta.env.VITE_SUPABASE_ANON_KEY ||
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Y3J4c2x0aWF0bXFob29rY3ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NDI4NzYsImV4cCI6MjEwNzExODg3Nn0.hfrTD27AG4L_gYbY3ij0nejDflZVOu8m-U-tcnLRvOY";
 
-    if (!profileError) {
+      // Isolated Supabase client to prevent replacing the active admin session
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+
+      const { data: authData, error: authError } = await tempClient.auth.signUp({
+        email: newAuthor.email.trim(),
+        password: newAuthor.password,
+        options: {
+          data: {
+            full_name: newAuthor.full_name.trim(),
+          },
+        },
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      const newId = authData.user?.id || crypto.randomUUID();
+
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: newId,
+        email: newAuthor.email.trim(),
+        full_name: newAuthor.full_name.trim(),
+        role: newAuthor.role,
+        phone: newAuthor.phone,
+        address: newAuthor.address,
+        city: newAuthor.city,
+        bio: newAuthor.bio,
+        is_approved: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (profileError) throw profileError;
+
       await supabase.from("user_roles").upsert({
         user_id: newId,
         role: newAuthor.role,
       });
-    }
 
-    setModalSaving(false);
-    if (profileError) {
-      setErrorMsg(profileError.message);
-    } else {
+      setProvisionedCredentials({
+        email: newAuthor.email.trim(),
+        password: newAuthor.password,
+        name: newAuthor.full_name.trim(),
+        role: newAuthor.role,
+      });
+
       setShowAddModal(false);
       setNewAuthor({
         email: "",
+        password: "",
         full_name: "",
         role: "author",
         phone: "",
@@ -1029,17 +1299,42 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
         bio: "",
         is_approved: true,
       });
-      loadAuthors();
+      await loadAuthors();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to create journalist account.");
+    } finally {
+      setModalSaving(false);
     }
   };
 
   const handleRemoveAuthor = async (author: any) => {
-    if (!confirm(`Are you sure you want to remove author ${author.full_name || author.email}?`)) {
+    if (author.email === "forbesclone09@gmail.com") {
+      alert("The primary super administrator account cannot be removed.");
       return;
     }
-    await supabase.from("profiles").delete().eq("id", author.id);
-    await supabase.from("user_roles").update({ role: "user" }).eq("user_id", author.id);
-    loadAuthors();
+    if (author.id === session?.user?.id) {
+      alert("You cannot remove your own active administrator account.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently remove journalist ${
+        author.full_name || author.email
+      }?\n\nThis will revoke their newsroom access and delete their contributor profile.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await supabase.from("profiles").delete().eq("id", author.id);
+      await supabase.from("user_roles").delete().eq("user_id", author.id);
+      setAuthors((prev) => prev.filter((a) => a.id !== author.id));
+      setActionFeedback({
+        text: `Journalist ${author.full_name || author.email} has been removed.`,
+        type: "success",
+      });
+      setTimeout(() => setActionFeedback(null), 4000);
+    } catch (err: any) {
+      alert(`Error removing journalist: ${err.message || "Unknown error"}`);
+    }
   };
 
   const pendingAuthors = authors.filter(
@@ -1250,10 +1545,11 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                     >
                       Edit Details
                     </button>
-                    {author.role !== "admin" && !isSuper && (
+                    {!isSuper && author.id !== session?.user?.id && (
                       <button
                         onClick={() => handleRemoveAuthor(author)}
-                        className="text-[0.8rem] font-semibold text-red-500 hover:text-red-700"
+                        className="text-[0.8rem] font-semibold text-red-600 hover:text-red-800 transition-colors"
+                        title="Remove journalist from newsroom"
                       >
                         Remove
                       </button>
@@ -1472,22 +1768,49 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg border border-rule bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="font-display text-[1.4rem] text-foreground">Add New Author</h3>
+            <h3 className="font-display text-[1.4rem] text-foreground">Add New Journalist</h3>
             <p className="mt-1 text-[0.85rem] text-ink-soft">
-              Create an author profile in the system.
+              Provision an official newsroom author account with unique credentials and custom role permissions.
             </p>
 
             <form onSubmit={handleAddAuthor} className="mt-5 space-y-4">
               <div>
-                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Author Email*</label>
+                <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">Journalist Email*</label>
                 <input
                   type="email"
                   required
                   value={newAuthor.email}
                   onChange={(e) => setNewAuthor({ ...newAuthor, email: e.target.value })}
-                  placeholder="author@example.com"
+                  placeholder="journalist@forbes.com"
                   className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-[0.75rem] font-semibold uppercase text-ink-soft">
+                    Initial Password*
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generatePassword}
+                    className="text-[0.7rem] font-bold text-brand hover:underline"
+                  >
+                    Auto-Generate Password
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  minLength={6}
+                  value={newAuthor.password}
+                  onChange={(e) => setNewAuthor({ ...newAuthor, password: e.target.value })}
+                  placeholder="e.g. Press@2025!"
+                  className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] font-mono outline-none focus:border-foreground"
+                />
+                <p className="mt-1 text-[0.72rem] text-ink-soft">
+                  The journalist can change this password anytime in their <strong>Profile & Security</strong> tab.
+                </p>
               </div>
 
               <div>
@@ -1497,7 +1820,7 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                   required
                   value={newAuthor.full_name}
                   onChange={(e) => setNewAuthor({ ...newAuthor, full_name: e.target.value })}
-                  placeholder="Jane Doe"
+                  placeholder="e.g. Sarah Jenkins"
                   className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
                 />
               </div>
@@ -1509,9 +1832,9 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                   onChange={(e) => setNewAuthor({ ...newAuthor, role: e.target.value })}
                   className="mt-1 w-full border border-rule bg-background px-3 py-2 text-[0.9rem] outline-none focus:border-foreground"
                 >
-                  <option value="author">Author (Standard author access)</option>
-                  <option value="admin">Admin (Full administrative & editing access)</option>
-                  <option value="contributor">Contributor (Guest author)</option>
+                  <option value="author">Author (Can draft and edit own stories)</option>
+                  <option value="admin">Admin (Full administrative & editing access across newsroom)</option>
+                  <option value="contributor">Contributor (Guest author drafts)</option>
                   <option value="user">User (Reader account)</option>
                 </select>
               </div>
@@ -1552,10 +1875,71 @@ function AuthorsManager({ session, onPendingChange }: { session: any; onPendingC
                   disabled={modalSaving}
                   className="bg-foreground px-4 py-2 text-[0.75rem] font-semibold uppercase text-background hover:bg-brand disabled:opacity-50"
                 >
-                  {modalSaving ? "Adding..." : "Add Author"}
+                  {modalSaving ? "Provisioning..." : "Provision Journalist"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Handover Credentials Modal */}
+      {provisionedCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg border border-emerald-500/50 bg-background p-6 shadow-2xl">
+            <div className="flex items-center gap-2 text-emerald-600 border-b border-rule pb-3">
+              <Check className="h-6 w-6" />
+              <h3 className="font-display text-[1.4rem] text-foreground">
+                Journalist Account Ready!
+              </h3>
+            </div>
+            <p className="mt-2 text-[0.88rem] text-ink-soft">
+              A newsroom account for <strong>{provisionedCredentials.name}</strong> has been provisioned. Provide them these credentials to access the newsroom:
+            </p>
+
+            <div className="mt-4 bg-zinc-900 text-zinc-100 p-4 rounded font-mono text-xs space-y-2 border border-zinc-800">
+              <div>
+                <span className="text-zinc-500">Secret Login URL:</span>{" "}
+                <span className="text-emerald-400">https://premium-publish-pro.vercel.app/privatelogin</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">Email:</span>{" "}
+                <span className="text-white font-semibold">{provisionedCredentials.email}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">Initial Password:</span>{" "}
+                <span className="text-amber-300 font-semibold">{provisionedCredentials.password}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">Assigned Role:</span>{" "}
+                <span className="text-blue-300 uppercase font-semibold">{provisionedCredentials.role}</span>
+              </div>
+            </div>
+
+            <p className="mt-3 text-[0.75rem] text-ink-soft">
+              Note: The journalist can sign in directly through the secret <code>/privatelogin</code> page and change their password in the <strong>Profile & Security</strong> tab.
+            </p>
+
+            <div className="mt-6 flex justify-between items-center gap-3 border-t border-rule pt-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  const handoverText = `Forbes Germany Newsroom Access Credentials:\n\nSecret Login URL: https://premium-publish-pro.vercel.app/privatelogin\nEmail: ${provisionedCredentials.email}\nInitial Password: ${provisionedCredentials.password}\nRole: ${provisionedCredentials.role}\n\nPlease sign in and update your password under Profile & Security.`;
+                  await navigator.clipboard.writeText(handoverText);
+                  alert("Journalist credentials copied to clipboard!");
+                }}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors rounded shadow-xs"
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy Credentials
+              </button>
+              <button
+                type="button"
+                onClick={() => setProvisionedCredentials(null)}
+                className="border border-rule px-4 py-2 text-xs font-semibold uppercase hover:bg-secondary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1868,6 +2252,11 @@ export async function initializeComputeSovereignty(region: "eu-central") {
   ];
 
   const handleSave = async () => {
+    if (initialArticle && !isAdmin && isOwner && !isOwner(initialArticle)) {
+      alert("Permission denied: You cannot edit articles published by other journalists or administrators.");
+      return;
+    }
+
     setSaved("Saving...");
     const slug = initialArticle?.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     
@@ -2234,6 +2623,31 @@ export async function initializeComputeSovereignty(region: "eu-central") {
             </button>
           </div>
           {saved && <p className={`mt-3 border-l-2 pl-3 text-[0.8rem] ${saved.includes('Error') ? 'border-red-500 text-red-500' : 'border-brand text-brand'}`}>{saved}</p>}
+
+          {initialArticle && (isAdmin || (isOwner && isOwner(initialArticle))) && (
+            <div className="mt-4 pt-4 border-t border-rule">
+              <button
+                type="button"
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    `Are you sure you want to permanently delete "${initialArticle.title}"?\n\nThis action cannot be undone.`
+                  );
+                  if (!confirmed) return;
+                  try {
+                    const { error } = await supabase.from("articles").delete().eq("slug", initialArticle.slug);
+                    if (error) throw error;
+                    onClose();
+                  } catch (err: any) {
+                    alert(`Failed to delete: ${err.message || "Unknown error"}`);
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1.5 border border-red-200 bg-red-50/70 hover:bg-red-50 text-red-600 hover:text-red-700 py-2 text-[0.75rem] font-semibold uppercase tracking-wider transition-colors"
+                title="Delete this article permanently"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete Story
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Modal for creating a new category */}

@@ -5,7 +5,7 @@ import { Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 import { categoryFeatures, featuredArticle, recentArticles, siteName } from "@/data/content";
 
 type FooterLink =
-  | { label: string; to: "/about" | "/contact" | "/privacy" | "/signup" | "/login" | "/" }
+  | { label: string; to: "/about" | "/contact" | "/privacy" | "/signup" | "/" }
   | { label: string; category: "Business" | "Tech" | "Startups" };
 
 const columns: { title: string; links: FooterLink[] }[] = [
@@ -34,7 +34,7 @@ const columns: { title: string; links: FooterLink[] }[] = [
       { label: "Founders", category: "Startups" },
       { label: "Markets", category: "Business" },
       { label: "Innovation", category: "Tech" },
-      { label: "Contributor sign in", to: "/login" },
+      { label: "Press & Media", to: "/contact" },
     ],
   },
 ];

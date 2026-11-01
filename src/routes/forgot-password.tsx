@@ -119,7 +119,7 @@ function ForgotPasswordPage() {
 
       <div className="mt-9 border-t border-rule pt-6 text-[0.88rem] text-ink-soft">
         Remembered your password?{" "}
-        <Link to="/login" className={authLinkClass}>
+        <Link to="/privatelogin" className={authLinkClass}>
           Back to sign in
         </Link>
         .

@@ -158,7 +158,7 @@ function ResetPasswordPage() {
           </p>
           <div className="mt-6">
             <Link
-              to="/login"
+              to="/privatelogin"
               className="inline-block w-full bg-foreground px-6 py-3.5 text-[0.82rem] font-semibold tracking-[0.08em] text-background uppercase transition-colors hover:bg-brand"
             >
               Sign in to your account
@@ -244,7 +244,7 @@ function ResetPasswordPage() {
 
           <div className="mt-9 border-t border-rule pt-6 text-[0.88rem] text-ink-soft">
             Remembered it?{" "}
-            <Link to="/login" className={authLinkClass}>
+            <Link to="/privatelogin" className={authLinkClass}>
               Back to sign in
             </Link>
             .
