@@ -271,7 +271,12 @@ function AuthorDashboardPage() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setTab(item.id as any)}
+                  onClick={() => {
+                    if (item.id === "editor" && tab !== "editor") {
+                      setActiveArticle(null);
+                    }
+                    setTab(item.id as any);
+                  }}
                   className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-colors shrink-0 cursor-pointer ${
                     isActive
                       ? "bg-zinc-950 text-white shadow-xs"
@@ -549,6 +554,7 @@ function AuthorDashboardPage() {
 
         {tab === "editor" && (
           <Editor
+            key={activeArticle?.slug || "new"}
             initialArticle={activeArticle}
             onClose={handleEditorClose}
             session={session}

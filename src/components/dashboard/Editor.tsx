@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import {
   Bold,
   Heading2,
@@ -20,6 +20,11 @@ import {
   Globe,
   FileText,
   Image as ImageIcon,
+  PenLine,
+  Eye,
+  Check,
+  X,
+  Trash2,
 } from "lucide-react";
 import { navCategories, siteName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
@@ -42,9 +47,13 @@ export function Editor({
   const [title, setTitle] = useState(initialArticle?.title || "");
   const [excerpt, setExcerpt] = useState(initialArticle?.deck || "");
   const [category, setCategory] = useState(initialArticle?.category || "Business");
-  // Handle content body. Store as simple text for MVP, parse back into JSON array on save.
+  // Handle content body safely whether array, string, or undefined
   const initialBodyText = initialArticle?.body 
-    ? initialArticle.body.map((b: any) => b.content).join("\n\n") 
+    ? Array.isArray(initialArticle.body)
+      ? initialArticle.body.map((b: any) => (typeof b === "string" ? b : b?.content || "")).join("\n\n")
+      : typeof initialArticle.body === "string"
+      ? initialArticle.body
+      : ""
     : "";
   const [content, setContent] = useState(initialBodyText);
   const [saved, setSaved] = useState("");
