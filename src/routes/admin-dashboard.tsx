@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   FileText,
@@ -16,6 +16,8 @@ import {
   Trash2,
   Globe,
   Filter,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 
 import { navCategories, siteName } from "@/data/content";
@@ -87,6 +89,24 @@ function AdminDashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeArticle, setActiveArticle] = useState<any>(null);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target as Node)) {
+        setIsMobileNavOpen(false);
+      }
+    };
+    if (isMobileNavOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isMobileNavOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -300,13 +320,119 @@ function AdminDashboardPage() {
 
       {/* Subnav Navigation */}
       <div className="bg-white border-b border-rule shadow-xs sticky top-14 z-30">
-        <div className="mx-auto flex h-13 sm:h-14 w-full max-w-[1400px] items-center justify-between px-3 sm:px-6 lg:px-8 gap-2">
-          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
+        <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-3 sm:px-6 lg:px-8 gap-2">
+          
+          {/* Mobile Dropdown Selector (< sm) */}
+          <div ref={mobileNavRef} className="relative sm:hidden flex-1 min-w-0 max-w-[260px]">
+            <button
+              type="button"
+              onClick={() => setIsMobileNavOpen((prev) => !prev)}
+              className="flex items-center justify-between w-full gap-2 px-3 py-2 text-xs font-semibold rounded-lg bg-zinc-950 text-white shadow-xs border border-zinc-800 active:scale-[0.98] transition-all cursor-pointer"
+              aria-expanded={isMobileNavOpen}
+              aria-haspopup="listbox"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {(() => {
+                  const currentItem = [
+                    { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+                    { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
+                    { id: "editor", label: "Story Editor", icon: PenLine },
+                    { id: "profile", label: "Profile & Security", icon: User },
+                  ].find((t) => t.id === tab) || { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length };
+                  const Icon = currentItem.icon;
+                  return (
+                    <>
+                      <Icon className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                      <span className="truncate font-semibold">{currentItem.label}</span>
+                      {currentItem.badge ? (
+                        <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold leading-none shrink-0 ${
+                          currentItem.isWarning ? "bg-amber-500 text-white animate-pulse" : "bg-red-600 text-white"
+                        }`}>
+                          {currentItem.badge}
+                        </span>
+                      ) : typeof currentItem.count === "number" ? (
+                        <span className="rounded-full bg-red-600 text-white px-1.5 py-0.5 text-[0.6rem] font-bold leading-none shrink-0">
+                          {currentItem.count}
+                        </span>
+                      ) : null}
+                    </>
+                  );
+                })()}
+              </div>
+              <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 shrink-0 transition-transform duration-200 ${isMobileNavOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {/* Mobile Dropdown Menu Card */}
+            {isMobileNavOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-64 rounded-xl bg-white border border-zinc-200 p-1.5 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100">
+                <div className="px-2.5 py-1 text-[0.62rem] font-mono font-bold uppercase tracking-wider text-zinc-400">
+                  Switch Section
+                </div>
+                <div className="space-y-0.5 mt-0.5">
+                  {[
+                    { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+                    { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
+                    { id: "editor", label: "Story Editor", icon: PenLine },
+                    { id: "profile", label: "Profile & Security", icon: User },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isActive = tab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          if (item.id === "editor" && tab !== "editor") {
+                            setActiveArticle(null);
+                          }
+                          setTab(item.id as any);
+                          setIsMobileNavOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer ${
+                          isActive
+                            ? "bg-zinc-950 text-white font-semibold shadow-xs"
+                            : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-red-400" : "text-zinc-500"}`} />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          {item.badge ? (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold leading-none ${
+                              item.isWarning
+                                ? "bg-amber-500 text-white animate-pulse"
+                                : isActive
+                                ? "bg-red-600 text-white"
+                                : "bg-zinc-200 text-zinc-800"
+                            }`}>
+                              {item.badge}
+                            </span>
+                          ) : typeof item.count === "number" ? (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold leading-none ${
+                              isActive ? "bg-red-600 text-white" : "bg-zinc-100 text-zinc-700 border border-zinc-200"
+                            }`}>
+                              {item.count}
+                            </span>
+                          ) : null}
+                          {isActive && <Check className="h-3.5 w-3.5 text-red-500 ml-0.5" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Horizontal Tabs List (sm:) */}
+          <nav className="hidden sm:flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
             {[
-              { id: "all_stories", label: "Newsroom Articles", mobileLabel: "Articles", icon: Globe, count: rows.length },
-              { id: "authors", label: "Journalists & Team", mobileLabel: "Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
-              { id: "editor", label: "Story Editor", mobileLabel: "Editor", icon: PenLine },
-              { id: "profile", label: "Profile & Security", mobileLabel: "Profile", icon: User },
+              { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+              { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
+              { id: "editor", label: "Story Editor", icon: PenLine },
+              { id: "profile", label: "Profile & Security", icon: User },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = tab === item.id;
@@ -319,18 +445,17 @@ function AdminDashboardPage() {
                     }
                     setTab(item.id as any);
                   }}
-                  className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md transition-all shrink-0 cursor-pointer ${
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 text-sm font-semibold rounded-md transition-all shrink-0 cursor-pointer ${
                     isActive
                       ? "bg-zinc-950 text-white shadow-xs"
                       : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                  <span className="hidden sm:inline whitespace-nowrap">{item.label}</span>
-                  <span className="sm:hidden whitespace-nowrap">{item.mobileLabel}</span>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-nowrap">{item.label}</span>
                   {item.badge && (
                     <span
-                      className={`rounded-full px-1.5 sm:px-2 py-0.5 text-[0.62rem] sm:text-[0.65rem] font-bold leading-none shrink-0 ${
+                      className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none shrink-0 ${
                         item.isWarning
                           ? "bg-amber-500 text-white animate-pulse"
                           : isActive
@@ -343,7 +468,7 @@ function AdminDashboardPage() {
                   )}
                   {typeof item.count === "number" && !item.badge && (
                     <span
-                      className={`rounded-full px-1.5 sm:px-2 py-0.5 text-[0.62rem] sm:text-[0.65rem] font-bold leading-none shrink-0 ${
+                      className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none shrink-0 ${
                         isActive ? "bg-red-600 text-white" : "bg-zinc-200 text-zinc-800"
                       }`}
                     >
@@ -357,12 +482,11 @@ function AdminDashboardPage() {
 
           <button
             onClick={() => openEditor()}
-            className="inline-flex items-center gap-1 sm:gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all shrink-0 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white px-3 sm:px-3.5 py-2 sm:py-1.5 text-xs font-semibold uppercase tracking-wider rounded-lg sm:rounded transition-all shrink-0 shadow-xs cursor-pointer ml-auto"
             title="Compose New Story"
           >
             <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden sm:inline">Compose Story</span>
-            <span className="sm:hidden">Compose</span>
+            <span>Compose Story</span>
           </button>
         </div>
       </div>
