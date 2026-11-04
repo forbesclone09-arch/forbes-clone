@@ -22,6 +22,10 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as CategoryCategoryRouteImport } from './routes/category.$category'
+import { Route as AuthorLoginRouteImport } from './routes/author-login'
+import { Route as AuthorDashboardRouteImport } from './routes/author-dashboard'
+import { Route as PrivateAdminLoginRouteImport } from './routes/private-admin-login'
+import { Route as AdminDashboardRouteImport } from './routes/admin-dashboard'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +92,26 @@ const CategoryCategoryRoute = CategoryCategoryRouteImport.update({
   path: '/category/$category',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthorLoginRoute = AuthorLoginRouteImport.update({
+  id: '/author-login',
+  path: '/author-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthorDashboardRoute = AuthorDashboardRouteImport.update({
+  id: '/author-dashboard',
+  path: '/author-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivateAdminLoginRoute = PrivateAdminLoginRouteImport.update({
+  id: '/private-admin-login',
+  path: '/private-admin-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/admin-dashboard',
+  path: '/admin-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +127,10 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$category': typeof CategoryCategoryRoute
+  '/author-login': typeof AuthorLoginRoute
+  '/author-dashboard': typeof AuthorDashboardRoute
+  '/private-admin-login': typeof PrivateAdminLoginRoute
+  '/admin-dashboard': typeof AdminDashboardRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,6 +146,10 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$category': typeof CategoryCategoryRoute
+  '/author-login': typeof AuthorLoginRoute
+  '/author-dashboard': typeof AuthorDashboardRoute
+  '/private-admin-login': typeof PrivateAdminLoginRoute
+  '/admin-dashboard': typeof AdminDashboardRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +166,10 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/article/$slug': typeof ArticleSlugRoute
   '/category/$category': typeof CategoryCategoryRoute
+  '/author-login': typeof AuthorLoginRoute
+  '/author-dashboard': typeof AuthorDashboardRoute
+  '/private-admin-login': typeof PrivateAdminLoginRoute
+  '/admin-dashboard': typeof AdminDashboardRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +187,10 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/article/$slug'
     | '/category/$category'
+    | '/author-login'
+    | '/author-dashboard'
+    | '/private-admin-login'
+    | '/admin-dashboard'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +206,10 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/article/$slug'
     | '/category/$category'
+    | '/author-login'
+    | '/author-dashboard'
+    | '/private-admin-login'
+    | '/admin-dashboard'
   id:
     | '__root__'
     | '/'
@@ -181,6 +225,10 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/article/$slug'
     | '/category/$category'
+    | '/author-login'
+    | '/author-dashboard'
+    | '/private-admin-login'
+    | '/admin-dashboard'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +245,10 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ArticleSlugRoute: typeof ArticleSlugRoute
   CategoryCategoryRoute: typeof CategoryCategoryRoute
+  AuthorLoginRoute: typeof AuthorLoginRoute
+  AuthorDashboardRoute: typeof AuthorDashboardRoute
+  PrivateAdminLoginRoute: typeof PrivateAdminLoginRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +344,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CategoryCategoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/author-login': {
+      id: '/author-login'
+      path: '/author-login'
+      fullPath: '/author-login'
+      preLoaderRoute: typeof AuthorLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/author-dashboard': {
+      id: '/author-dashboard'
+      path: '/author-dashboard'
+      fullPath: '/author-dashboard'
+      preLoaderRoute: typeof AuthorDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/private-admin-login': {
+      id: '/private-admin-login'
+      path: '/private-admin-login'
+      fullPath: '/private-admin-login'
+      preLoaderRoute: typeof PrivateAdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-dashboard': {
+      id: '/admin-dashboard'
+      path: '/admin-dashboard'
+      fullPath: '/admin-dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -309,6 +389,10 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ArticleSlugRoute: ArticleSlugRoute,
   CategoryCategoryRoute: CategoryCategoryRoute,
+  AuthorLoginRoute: AuthorLoginRoute,
+  AuthorDashboardRoute: AuthorDashboardRoute,
+  PrivateAdminLoginRoute: PrivateAdminLoginRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

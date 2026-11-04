@@ -132,7 +132,13 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
-  const isBackoffice = pathname.startsWith("/dashboard") || pathname.startsWith("/privatelogin");
+  const isBackoffice =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/privatelogin") ||
+    pathname.startsWith("/private-admin-login") ||
+    pathname.startsWith("/admin-dashboard") ||
+    pathname.startsWith("/author-login") ||
+    pathname.startsWith("/author-dashboard");
 
   if (isBackoffice) {
     return (
