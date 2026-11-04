@@ -41,6 +41,35 @@ export const Route = createFileRoute("/author-dashboard")({
       { name: "description", content: "Draft, pitch, and manage your articles for Forbes Germany." },
     ],
   }),
+  errorComponent: ({ error }) => (
+    <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa] p-6 text-zinc-900">
+      <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-lg">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Author Studio Notice</h2>
+        <p className="text-sm text-zinc-600 mb-4">
+          Something went wrong while displaying your contributor studio.
+        </p>
+        {error?.message && (
+          <pre className="mb-4 max-h-36 overflow-x-auto rounded bg-red-50 p-3 text-left font-mono text-xs text-red-700 whitespace-pre-wrap border border-red-100">
+            {error.message}
+          </pre>
+        )}
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded bg-zinc-950 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-red-600 transition-colors"
+          >
+            Reload Studio
+          </button>
+          <a
+            href="/"
+            className="rounded border border-zinc-300 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-700 hover:bg-zinc-100 transition-colors"
+          >
+            Public Site
+          </a>
+        </div>
+      </div>
+    </div>
+  ),
   component: AuthorDashboardPage,
 });
 
@@ -58,21 +87,33 @@ function AuthorDashboardPage() {
   const [activeArticle, setActiveArticle] = useState<any>(null);
 
   useEffect(() => {
+    let isMounted = true;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
       if (!session) {
         navigate({ to: "/author-login" });
-      } else {
+        return;
+      }
+      try {
         setSession(session);
         const { isApproved: approved, fullName } = await getUserRoleAndApproval(session.user.id, session.user.email);
+        if (!isMounted) return;
         setIsApproved(approved);
         if (fullName) setUserFullName(fullName);
         if (approved) {
-          fetchData();
+          await fetchData();
         } else {
           setLoading(false);
         }
+      } catch (err) {
+        console.error("Author dashboard init error:", err);
+        setLoading(false);
       }
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const fetchData = async () => {
@@ -115,13 +156,21 @@ function AuthorDashboardPage() {
   const visible = displayedRows.filter((r) => {
     const matchesFilter = filter === "All" || r.status === filter;
     const q = searchQuery.trim().toLowerCase();
+    if (!q) return matchesFilter;
+
+    const titleStr = (r.article.title || "").toLowerCase();
+    const deckStr = (r.article.deck || "").toLowerCase();
+    const authorStr = (
+      typeof r.article.author === "string"
+        ? r.article.author
+        : r.article.author?.name || ""
+    ).toLowerCase();
+
     const matchesSearch =
-      !q ||
-      r.article.title.toLowerCase().includes(q) ||
-      r.article.deck?.toLowerCase().includes(q) ||
-      (typeof r.article.author === "string"
-        ? r.article.author.toLowerCase().includes(q)
-        : r.article.author?.name?.toLowerCase().includes(q));
+      titleStr.includes(q) ||
+      deckStr.includes(q) ||
+      authorStr.includes(q);
+
     return matchesFilter && matchesSearch;
   });
 

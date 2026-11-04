@@ -41,6 +41,35 @@ export const Route = createFileRoute("/admin-dashboard")({
       { name: "description", content: "Manage newsroom publications, editorial approvals, and team roles." },
     ],
   }),
+  errorComponent: ({ error }) => (
+    <div className="flex min-h-screen items-center justify-center bg-[#090a0f] p-6 text-zinc-100">
+      <div className="max-w-md rounded-lg border border-red-900/60 bg-zinc-900 p-6 text-center shadow-xl">
+        <h2 className="text-xl font-bold text-red-500 mb-2">Executive Newsroom Notice</h2>
+        <p className="text-sm text-zinc-400 mb-4">
+          Something went wrong while displaying the administrative dashboard.
+        </p>
+        {error?.message && (
+          <pre className="mb-4 max-h-36 overflow-x-auto rounded bg-black/70 p-3 text-left font-mono text-xs text-red-300 whitespace-pre-wrap">
+            {error.message}
+          </pre>
+        )}
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded bg-red-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-red-700 transition-colors"
+          >
+            Reload Newsroom
+          </button>
+          <a
+            href="/"
+            className="rounded border border-zinc-700 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-800 transition-colors"
+          >
+            Public Site
+          </a>
+        </div>
+      </div>
+    </div>
+  ),
   component: AdminDashboardPage,
 });
 
@@ -60,20 +89,32 @@ function AdminDashboardPage() {
   const [activeArticle, setActiveArticle] = useState<any>(null);
 
   useEffect(() => {
+    let isMounted = true;
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
       if (!session) {
         navigate({ to: "/private-admin-login" });
-      } else {
+        return;
+      }
+      try {
         const { isAdmin, fullName } = await getUserRoleAndApproval(session.user.id, session.user.email);
+        if (!isMounted) return;
         if (!isAdmin) {
           navigate({ to: "/author-dashboard" });
           return;
         }
         setSession(session);
         if (fullName) setUserFullName(fullName);
-        fetchData();
+        await fetchData();
+      } catch (err) {
+        console.error("Admin dashboard init error:", err);
+        setLoading(false);
       }
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const fetchData = async () => {
@@ -120,15 +161,24 @@ function AdminDashboardPage() {
 
   const visible = rows.filter((r) => {
     const matchesFilter = filter === "All" || r.status === filter;
-    const matchesCat = categoryFilter === "All" || r.article.category.toLowerCase() === categoryFilter.toLowerCase();
+    const cat = (r.article.category || "").toLowerCase();
+    const matchesCat = categoryFilter === "All" || cat === categoryFilter.toLowerCase();
     const q = searchQuery.trim().toLowerCase();
+    if (!q) return matchesFilter && matchesCat;
+
+    const titleStr = (r.article.title || "").toLowerCase();
+    const deckStr = (r.article.deck || "").toLowerCase();
+    const authorStr = (
+      typeof r.article.author === "string"
+        ? r.article.author
+        : r.article.author?.name || ""
+    ).toLowerCase();
+
     const matchesSearch =
-      !q ||
-      r.article.title.toLowerCase().includes(q) ||
-      r.article.deck?.toLowerCase().includes(q) ||
-      (typeof r.article.author === "string"
-        ? r.article.author.toLowerCase().includes(q)
-        : r.article.author?.name?.toLowerCase().includes(q));
+      titleStr.includes(q) ||
+      deckStr.includes(q) ||
+      authorStr.includes(q);
+
     return matchesFilter && matchesCat && matchesSearch;
   });
 
@@ -467,13 +517,15 @@ function AdminDashboardPage() {
                             </div>
                             <Link
                               to="/article/$slug"
-                              params={{ slug: article.slug }}
+                              params={{ slug: article.slug || "unknown" }}
                               className="mt-1 block font-display text-[1.05rem] sm:text-[1.1rem] leading-snug hover:text-red-600 line-clamp-2 text-foreground font-semibold"
                             >
-                              {article.title}
+                              {article.title || "Untitled Story"}
                             </Link>
                             <p className="mt-1 text-[0.76rem] sm:text-[0.8rem] text-ink-soft">
-                              <span className="font-medium text-foreground">{article.author.name}</span> · {article.published} · {article.readTime} min read
+                              <span className="font-medium text-foreground">
+                                {typeof article.author === "string" ? article.author : article.author?.name || "Staff Writer"}
+                              </span> · {article.published} · {article.readTime} min read
                             </p>
                           </div>
                         </div>
@@ -495,7 +547,7 @@ function AdminDashboardPage() {
                           <div className="flex items-center gap-1.5">
                             <Link
                               to="/article/$slug"
-                              params={{ slug: article.slug }}
+                              params={{ slug: article.slug || "unknown" }}
                               className="inline-flex items-center gap-1 font-semibold text-zinc-600 hover:text-zinc-950 px-2 py-1 border border-rule hover:border-zinc-400 transition-colors text-[0.75rem] rounded"
                               title="Preview Article on Live Site"
                             >

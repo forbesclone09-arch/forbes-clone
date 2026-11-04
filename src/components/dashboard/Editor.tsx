@@ -234,7 +234,7 @@ export function Editor({
 <p>Nations across the European Union are allocating tens of billions of euros toward localized AI infrastructure, aiming to reduce strategic dependence on external technology monopolies.</p>
 
 <blockquote>
-  "Digital sovereignty is not merely a commercial advantageâ€”it is the foundational prerequisite of twenty-first century economic autonomy."
+  "Digital sovereignty is not merely a commercial advantage — it is the foundational prerequisite of twenty-first century economic autonomy."
 </blockquote>
 
 <p>Industry analysts note three transformative pillars leading this historic pivot:</p>
@@ -344,8 +344,18 @@ export async function initializeComputeSovereignty(region: "eu-central") {
       return;
     }
 
-    setSaved("Saving...");
-    const slug = initialArticle?.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setSaved("Error: Please enter a headline for your story.");
+      return;
+    }
+
+    setSaved("Saving story...");
+    const baseSlug = trimmedTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "") || `story-${Date.now()}`;
+    const slug = initialArticle?.slug || baseSlug;
     
     // Parse paragraphs and HTML blocks intelligently
     const isHtmlContent = /<(p|div|h[1-6]|blockquote|pre|ul|ol|table|figure|section|article)[\s>]/i.test(content);
@@ -372,25 +382,25 @@ export async function initializeComputeSovereignty(region: "eu-central") {
         .map((p) => ({ type: "paragraph", content: p }));
     }
     
-    const wordCount = content.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length;
+    const wordCount = content.replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
     const readTimeCalc = `${Math.max(1, Math.round(wordCount / 200))} min read`;
 
     const isNew = !initialArticle;
     const authorName = initialArticle
       ? (typeof initialArticle.author === "string" ? initialArticle.author : initialArticle.author?.name || "Staff Writer")
-      : (userFullName || session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Staff Writer");
+      : (userFullName || session?.user?.user_metadata?.full_name || session?.user?.email?.split("@")[0] || "Staff Writer");
 
     const authorId = initialArticle?.author_id || (isNew ? session?.user?.id : null);
     const authorEmail = initialArticle?.author_email || (isNew ? session?.user?.email : null);
 
     const articleData: any = {
       slug,
-      title,
-      excerpt,
-      category,
+      title: trimmedTitle,
+      excerpt: excerpt.trim(),
+      category: category || "Business",
       body: paragraphs,
       image_url: imageUrl || initialArticle?.image || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80",
-      image_alt: title || "Article Image",
+      image_alt: trimmedTitle || "Article Image",
       author: authorName,
       read_time: readTimeCalc,
       published_at: initialArticle?.published_at || new Date().toISOString(),
@@ -399,20 +409,46 @@ export async function initializeComputeSovereignty(region: "eu-central") {
       author_email: authorEmail,
     };
 
-    let { error } = await supabase.from('articles').upsert(articleData, { onConflict: 'slug' });
-    if (error && (error.message.includes('author_id') || error.message.includes('author_email') || (error as any).code === '42703')) {
-      const fallbackData = { ...articleData };
-      delete fallbackData.author_id;
-      delete fallbackData.author_email;
-      const res = await supabase.from('articles').upsert(fallbackData, { onConflict: 'slug' });
-      error = res.error;
+    let saveError: any = null;
+
+    if (isNew) {
+      // 1. Dedicated INSERT for new stories (avoids Postgres UPSERT RLS complications)
+      const res = await supabase.from("articles").insert(articleData);
+      saveError = res.error;
+
+      // Schema fallback if author_id or author_email columns are missing
+      if (saveError && (saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
+        const fallbackData = { ...articleData };
+        delete fallbackData.author_id;
+        delete fallbackData.author_email;
+        const retryRes = await supabase.from("articles").insert(fallbackData);
+        saveError = retryRes.error;
+      }
+    } else {
+      // 2. Dedicated UPDATE for existing stories
+      const res = await supabase
+        .from("articles")
+        .update(articleData)
+        .eq("slug", initialArticle.slug);
+      saveError = res.error;
+
+      if (saveError && (saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
+        const fallbackData = { ...articleData };
+        delete fallbackData.author_id;
+        delete fallbackData.author_email;
+        const retryRes = await supabase
+          .from("articles")
+          .update(fallbackData)
+          .eq("slug", initialArticle.slug);
+        saveError = retryRes.error;
+      }
     }
     
-    if (error) {
-      setSaved(`Error: ${error.message}`);
+    if (saveError) {
+      setSaved(`Error: ${saveError.message}`);
     } else {
-      setSaved("Successfully saved to Supabase!");
-      setTimeout(() => onClose(), 1500);
+      setSaved("Successfully saved story!");
+      setTimeout(() => onClose(), 1200);
     }
   };
 
@@ -450,7 +486,7 @@ export async function initializeComputeSovereignty(region: "eu-central") {
         <input
           value={excerpt}
           onChange={(e) => setExcerpt(e.target.value)}
-          placeholder="Standfirst â€” one or two sentences that sell the story"
+          placeholder="Standfirst — one or two sentences that sell the story"
           className="mt-4 w-full bg-transparent text-[1.05rem] text-ink-soft outline-none"
         />
         
@@ -578,7 +614,7 @@ export async function initializeComputeSovereignty(region: "eu-central") {
               className="min-h-[460px] w-full resize-y border border-t-0 border-rule bg-transparent p-5 font-serif text-[1.05rem] leading-relaxed outline-none focus:border-foreground"
             />
             <div className="flex items-center justify-between border border-t-0 border-rule bg-secondary/10 px-4 py-2 text-xs text-ink-soft">
-              <span>{content.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length} words â€¢ {content.length} characters</span>
+              <span>{content.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length} words · {content.length} characters</span>
               <span className="italic">Tip: Switch to <b>Code / HTML</b> to inspect or edit raw tags.</span>
             </div>
           </div>
@@ -628,9 +664,9 @@ export async function initializeComputeSovereignty(region: "eu-central") {
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   HTML / Raw Markup Active
                 </span>
-                <span>â€¢</span>
+                <span>·</span>
                 <span>{content.split("\n").length} lines</span>
-                <span>â€¢</span>
+                <span>·</span>
                 <span>{content.length} characters</span>
               </div>
               <div className="text-[0.75rem] text-gray-400">
@@ -1027,7 +1063,7 @@ export async function initializeComputeSovereignty(region: "eu-central") {
                   }
                   className="border border-rule bg-secondary/30 px-3 py-2 text-left text-xs font-semibold hover:border-foreground hover:bg-secondary transition-colors"
                 >
-                  ðŸ“Œ Callout Box
+                  📌 Callout Box
                 </button>
 
                 <button
@@ -1046,8 +1082,8 @@ export async function initializeComputeSovereignty(region: "eu-central") {
   <tbody>
     <tr>
       <td>Sovereign Cloud Deployments</td>
-      <td>â‚¬12.4B</td>
-      <td>â‚¬19.8B</td>
+      <td>€12.4B</td>
+      <td>€19.8B</td>
       <td>+59.6%</td>
     </tr>
     <tr>
@@ -1068,7 +1104,7 @@ export async function initializeComputeSovereignty(region: "eu-central") {
                   }
                   className="border border-rule bg-secondary/30 px-3 py-2 text-left text-xs font-semibold hover:border-foreground hover:bg-secondary transition-colors"
                 >
-                  ðŸ“Š Data Table
+                  📊 Data Table
                 </button>
 
                 <button
@@ -1085,7 +1121,7 @@ export interface ClusterSovereigntyConfig {
                   }
                   className="border border-rule bg-secondary/30 px-3 py-2 text-left text-xs font-semibold hover:border-foreground hover:bg-secondary transition-colors"
                 >
-                  ðŸ’» Code Block
+                  💻 Code Block
                 </button>
 
                 <button
@@ -1095,14 +1131,14 @@ export interface ClusterSovereigntyConfig {
 `<blockquote class="my-6 border-l-4 border-foreground pl-4 italic text-lg leading-relaxed">
   "European digital sovereignty will ultimately be determined not by policy declarations, but by the physical compute and clean energy capacity built on the continent."
   <footer class="mt-2 text-xs not-italic font-sans uppercase tracking-wider text-ink-soft">
-    â€” Managing Director, European Innovation Council
+    — Managing Director, European Innovation Council
   </footer>
 </blockquote>`
                     )
                   }
                   className="border border-rule bg-secondary/30 px-3 py-2 text-left text-xs font-semibold hover:border-foreground hover:bg-secondary transition-colors"
                 >
-                  ðŸ’¬ Pull Quote
+                  💬 Pull Quote
                 </button>
               </div>
             </div>
