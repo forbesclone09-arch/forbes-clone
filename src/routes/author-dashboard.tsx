@@ -272,15 +272,18 @@ function AuthorDashboardPage() {
               <span className="font-display text-sm sm:text-base font-bold tracking-tight text-white whitespace-nowrap">
                 Forbes Germany
               </span>
-              <span className="hidden sm:inline-flex text-[0.62rem] font-mono uppercase tracking-[0.2em] text-zinc-400 border border-zinc-700/80 px-2 py-0.5 rounded whitespace-nowrap">
+              <span className="hidden lg:inline-flex text-[0.62rem] font-mono uppercase tracking-[0.2em] text-zinc-400 border border-zinc-700/80 px-2 py-0.5 rounded whitespace-nowrap">
                 Journalist Studio
+              </span>
+              <span className="hidden sm:inline-flex lg:hidden text-[0.6rem] font-mono uppercase tracking-wider text-zinc-400 border border-zinc-700/80 bg-zinc-800/60 px-1.5 py-0.5 rounded whitespace-nowrap">
+                Studio
               </span>
               <span className="sm:hidden text-[0.58rem] font-mono uppercase tracking-wider text-zinc-300 border border-zinc-700/80 bg-zinc-800/60 px-1.5 py-0.5 rounded font-bold shrink-0">
                 Journalist
               </span>
             </div>
-            <div className="hidden lg:flex items-center gap-1.5 ml-2">
-              <span className="bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[0.65rem] px-2 py-0.5 rounded uppercase tracking-wider font-semibold inline-flex items-center gap-1">
+            <div className="hidden xl:flex items-center gap-1.5 ml-2">
+              <span className="bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[0.65rem] px-2 py-0.5 rounded uppercase tracking-wider font-semibold inline-flex items-center gap-1 whitespace-nowrap">
                 <PenLine className="size-3 text-red-500" /> Staff Journalist
               </span>
             </div>
@@ -292,11 +295,11 @@ function AuthorDashboardPage() {
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 px-2 sm:px-2.5 py-1.5 rounded"
+              className="inline-flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 px-2 sm:px-2.5 py-1.5 rounded whitespace-nowrap"
               title="Open Public Portal in new tab"
             >
-              <span className="hidden md:inline">Public Portal</span>
-              <ExternalLink className="size-3.5" />
+              <span className="hidden md:inline whitespace-nowrap">Public Portal</span>
+              <ExternalLink className="size-3.5 shrink-0" />
             </a>
 
             <div className="h-4 w-px bg-zinc-800 hidden sm:block" />
@@ -323,10 +326,10 @@ function AuthorDashboardPage() {
                 await supabase.auth.signOut();
                 navigate({ to: "/author-login" });
               }}
-              className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-900/80 transition-colors py-1.5 px-2 sm:px-2.5 border border-zinc-800 hover:border-red-900/60 rounded cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-red-400 hover:bg-zinc-900/80 transition-colors py-1.5 px-2 sm:px-2.5 border border-zinc-800 hover:border-red-900/60 rounded cursor-pointer whitespace-nowrap"
               title="Sign Out of Newsroom Studio"
             >
-              <LogOut className="size-3.5" />
+              <LogOut className="size-3.5 shrink-0" />
               <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
@@ -337,8 +340,8 @@ function AuthorDashboardPage() {
       <div className="bg-white border-b border-rule shadow-xs sticky top-14 z-30">
         <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-3 sm:px-6 lg:px-8 gap-2">
           
-          {/* Mobile Dropdown Selector (< sm) */}
-          <div ref={mobileNavRef} className="relative sm:hidden flex-1 min-w-0 max-w-[260px]">
+          {/* Mobile & Tablet Dropdown Selector (< lg) */}
+          <div ref={mobileNavRef} className="relative lg:hidden flex-1 min-w-0 max-w-[230px] sm:max-w-[280px]">
             <button
               type="button"
               onClick={() => setIsMobileNavOpen((prev) => !prev)}
@@ -421,12 +424,26 @@ function AuthorDashboardPage() {
                     );
                   })}
                 </div>
+
+                <div className="pt-1.5 mt-1.5 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openEditor();
+                      setIsMobileNavOpen(false);
+                    }}
+                    className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-500 transition-colors cursor-pointer justify-center shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Start New Story</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Desktop Horizontal Tabs List (sm:) */}
-          <nav className="hidden sm:flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
+          {/* Desktop Horizontal Tabs List (lg:) */}
+          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
             {[
               { id: "my_stories", label: "My Stories", icon: BookOpen, count: myRows.length },
               { id: "editor", label: "Compose Story", icon: PenLine },
@@ -468,11 +485,12 @@ function AuthorDashboardPage() {
 
           <button
             onClick={() => openEditor()}
-            className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white px-3 sm:px-3.5 py-2 sm:py-1.5 text-xs font-semibold uppercase tracking-wider rounded-lg sm:rounded transition-all shrink-0 shadow-xs cursor-pointer ml-auto"
+            className="inline-flex items-center justify-center gap-1 sm:gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold uppercase tracking-wider rounded-lg sm:rounded transition-all shrink-0 shadow-xs cursor-pointer ml-auto max-w-fit"
             title="Start New Story"
           >
             <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span>Start Story</span>
+            <span className="hidden sm:inline">Start Story</span>
+            <span className="sm:hidden">New Story</span>
           </button>
         </div>
       </div>
