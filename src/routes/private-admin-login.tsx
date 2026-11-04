@@ -96,26 +96,33 @@ function PrivateAdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#08080a] text-zinc-100 selection:bg-red-600 selection:text-white">
+    <div className="min-h-screen flex flex-col justify-between bg-[#08080a] text-zinc-100 selection:bg-red-600 selection:text-white w-full max-w-full overflow-x-clip">
       {/* Top bar */}
-      <header className="border-b border-zinc-800/80 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex size-7 items-center justify-center bg-red-600 font-display font-black text-sm text-white rounded">
+      <header className="border-b border-zinc-800/80 px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <span className="flex size-7 shrink-0 items-center justify-center bg-red-600 font-display font-black text-sm text-white rounded shadow-sm">
             F
           </span>
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-bold tracking-tight text-white">Forbes Germany</span>
-            <span className="text-[0.65rem] font-mono uppercase tracking-[0.2em] text-red-400 bg-red-950/60 border border-red-800/50 px-2 py-0.5 rounded">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap">
+              Forbes Germany
+            </span>
+            <span className="hidden sm:inline-flex text-[0.65rem] font-mono uppercase tracking-[0.2em] text-red-400 bg-red-950/60 border border-red-800/50 px-2 py-0.5 rounded whitespace-nowrap">
               Executive Admin Portal
+            </span>
+            <span className="sm:hidden text-[0.58rem] font-mono uppercase tracking-wider text-red-400 bg-red-950/60 border border-red-800/50 px-1.5 py-0.5 rounded font-bold shrink-0">
+              Admin
             </span>
           </div>
         </div>
 
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors py-1.5 px-2 rounded hover:bg-zinc-900/60 shrink-0"
         >
-          <ArrowLeft className="size-3.5" /> Return to Public Portal
+          <ArrowLeft className="size-3.5 shrink-0" />
+          <span className="hidden sm:inline">Return to Public Portal</span>
+          <span className="sm:hidden">Public Portal</span>
         </Link>
       </header>
 
