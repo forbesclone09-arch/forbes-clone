@@ -25,6 +25,7 @@ import {
   Check,
   X,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { navCategories, siteName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
@@ -749,26 +750,64 @@ export async function initializeComputeSovereignty(region: "eu-central") {
 
           {initialArticle && (isAdmin || (isOwner && isOwner(initialArticle))) && (
             <div className="mt-4 pt-4 border-t border-rule">
-              <button
-                type="button"
-                onClick={async () => {
-                  const confirmed = window.confirm(
-                    `Are you sure you want to permanently delete "${initialArticle.title}"?\n\nThis action cannot be undone.`
-                  );
-                  if (!confirmed) return;
-                  try {
-                    const { error } = await supabase.from("articles").delete().eq("slug", initialArticle.slug);
-                    if (error) throw error;
-                    onClose();
-                  } catch (err: any) {
-                    alert(`Failed to delete: ${err.message || "Unknown error"}`);
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-1.5 border border-red-200 bg-red-50/70 hover:bg-red-50 text-red-600 hover:text-red-700 py-2 text-[0.75rem] font-semibold uppercase tracking-wider transition-colors"
-                title="Delete this article permanently"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Delete Story
-              </button>
+              {initialArticle.deleted_at ? (
+                <div className="space-y-2">
+                  <div className="rounded border border-amber-300 bg-amber-50 p-2 text-center text-xs text-amber-800">
+                    This story is currently in Trash (30-day retention).
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from("articles")
+                          .update({ deleted_at: null })
+                          .eq("slug", initialArticle.slug);
+                        if (error) throw error;
+                        alert("Story restored successfully to Newsroom!");
+                        onClose();
+                      } catch (err: any) {
+                        alert(`Failed to restore: ${err.message || "Unknown error"}`);
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 border border-emerald-600 bg-emerald-600 hover:bg-emerald-500 text-white py-2 text-[0.75rem] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Restore Story to Newsroom
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const confirmed = window.confirm(
+                      `Move to Trash?\n\n"${initialArticle.title}" will be safely kept in Trash for 30 days.\nYou can restore it at any time from the Restore tab.`
+                    );
+                    if (!confirmed) return;
+                    try {
+                      const { error } = await supabase
+                        .from("articles")
+                        .update({ deleted_at: new Date().toISOString() })
+                        .eq("slug", initialArticle.slug);
+                      if (error) {
+                        if (error.code === "PGRST204" || error.message?.includes("deleted_at")) {
+                          alert(
+                            "Database Notice: 'deleted_at' column is missing in Supabase. Please run supabase-add-trash-and-restore.sql."
+                          );
+                          return;
+                        }
+                        throw error;
+                      }
+                      onClose();
+                    } catch (err: any) {
+                      alert(`Failed to move to trash: ${err.message || "Unknown error"}`);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 border border-red-200 bg-red-50/70 hover:bg-red-50 text-red-600 hover:text-red-700 py-2 text-[0.75rem] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                  title="Move this article to Trash (30 Days)"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Move to Trash (30 Days)
+                </button>
+              )}
             </div>
           )}
         </div>

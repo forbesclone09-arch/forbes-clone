@@ -16,7 +16,7 @@ export const Route = createFileRoute("/article/$slug")({
       .eq("slug", params.slug)
       .maybeSingle();
 
-    if (row) {
+    if (row && !row.deleted_at) {
       const article = {
         slug: row.slug,
         title: row.title,

@@ -17,6 +17,40 @@ export interface ArticleRow {
   image: string;
   body: any[];
   views: number;
+  deleted_at?: string | null;
+}
+
+export const TRASH_RETENTION_DAYS = 30;
+
+export interface TrashRetentionInfo {
+  deletedAt: Date;
+  expiresAt: Date;
+  daysPassed: number;
+  daysRemaining: number;
+  isExpired: boolean;
+  percentRemaining: number;
+}
+
+export function getTrashRetentionInfo(deletedAtString?: string | null): TrashRetentionInfo | null {
+  if (!deletedAtString) return null;
+  const deletedAt = new Date(deletedAtString);
+  if (isNaN(deletedAt.getTime())) return null;
+  const now = new Date();
+  const msPassed = Math.max(0, now.getTime() - deletedAt.getTime());
+  const daysPassed = Math.floor(msPassed / (1000 * 60 * 60 * 24));
+  const daysRemaining = Math.max(0, TRASH_RETENTION_DAYS - daysPassed);
+  const expiresAt = new Date(deletedAt.getTime() + TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const isExpired = daysRemaining === 0;
+  const percentRemaining = Math.max(0, Math.min(100, Math.round((daysRemaining / TRASH_RETENTION_DAYS) * 100)));
+
+  return {
+    deletedAt,
+    expiresAt,
+    daysPassed,
+    daysRemaining,
+    isExpired,
+    percentRemaining,
+  };
 }
 
 export function mapArticleRows(rows: any[]): ArticleRow[] {
@@ -38,6 +72,7 @@ export function mapArticleRows(rows: any[]): ArticleRow[] {
     image: row.image_url,
     body: row.body,
     views: row.views || 0,
+    deleted_at: row.deleted_at || null,
   }));
 }
 

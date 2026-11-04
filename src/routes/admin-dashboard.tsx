@@ -18,6 +18,7 @@ import {
   Filter,
   ChevronDown,
   Check,
+  RotateCcw,
 } from "lucide-react";
 
 import { navCategories, siteName } from "@/data/content";
@@ -33,6 +34,7 @@ import {
 import { AuthorsManager } from "@/components/dashboard/AuthorsManager";
 import { ProfileManager } from "@/components/dashboard/ProfileManager";
 import { Editor } from "@/components/dashboard/Editor";
+import { RestoreTab } from "@/components/dashboard/RestoreTab";
 
 export const Route = createFileRoute("/admin-dashboard")({
   staticData: { sitemap: false },
@@ -82,9 +84,10 @@ function AdminDashboardPage() {
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [totalAuthorsCount, setTotalAuthorsCount] = useState<number>(0);
   const [articles, setArticles] = useState<ArticleRow[]>([]);
+  const [trashedArticles, setTrashedArticles] = useState<ArticleRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<"all_stories" | "editor" | "profile" | "authors">("all_stories");
+  const [tab, setTab] = useState<"all_stories" | "restore" | "editor" | "profile" | "authors">("all_stories");
   const [filter, setFilter] = useState<"All" | Status>("All");
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -158,14 +161,19 @@ function AdminDashboardPage() {
       .select("*")
       .order("published_at", { ascending: false });
 
+    let rawList: any[] = [];
     if (artError) {
       const fallback = await supabase.from("articles").select("*");
       if (fallback.data) {
-        setArticles(mapArticleRows(fallback.data));
+        rawList = fallback.data;
       }
     } else if (articlesData) {
-      setArticles(mapArticleRows(articlesData));
+      rawList = articlesData;
     }
+
+    const mapped = mapArticleRows(rawList);
+    setArticles(mapped.filter((a) => !a.deleted_at));
+    setTrashedArticles(mapped.filter((a) => !!a.deleted_at));
     setLoading(false);
   };
 
@@ -215,16 +223,76 @@ function AdminDashboardPage() {
 
   const handleDeleteArticle = async (article: any) => {
     const confirmed = window.confirm(
-      `Executive Action: Are you sure you want to permanently delete "${article.title}"?\n\nThis article will be completely removed from Forbes Germany.`
+      `Move to Trash?\n\n"${article.title}" will be safely kept in Trash for 30 days.\nYou can restore it at any time from the Restore tab.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from("articles")
+        .update({ deleted_at: nowIso })
+        .eq("slug", article.slug);
+
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("deleted_at")) {
+          alert(
+            "Database Notice: The 'deleted_at' column is not yet present in your Supabase 'articles' table.\n\nPlease run the SQL migration script: supabase-add-trash-and-restore.sql in your Supabase SQL editor to enable the 30-day trash system."
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+      setTrashedArticles((prev) => [
+        { ...article, deleted_at: nowIso },
+        ...prev.filter((a) => a.slug !== article.slug),
+      ]);
+    } catch (err: any) {
+      alert(`Failed to move article to trash: ${err.message || "Unknown error"}`);
+    }
+  };
+
+  const handleRestoreArticle = async (article: ArticleRow) => {
+    try {
+      const { error } = await supabase
+        .from("articles")
+        .update({ deleted_at: null })
+        .eq("slug", article.slug);
+
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("deleted_at")) {
+          alert(
+            "Database Notice: The 'deleted_at' column is not yet present in your Supabase 'articles' table.\n\nPlease run the SQL migration script: supabase-add-trash-and-restore.sql in your Supabase SQL editor."
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setTrashedArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+      setArticles((prev) => [{ ...article, deleted_at: null }, ...prev]);
+    } catch (err: any) {
+      alert(`Failed to restore article: ${err.message || "Unknown error"}`);
+      throw err;
+    }
+  };
+
+  const handlePermanentDeleteArticle = async (article: ArticleRow) => {
+    const confirmed = window.confirm(
+      `PERMANENT REMOVAL WARNING:\n\nAre you sure you want to permanently delete "${article.title}"?\n\nThis article will be completely wiped from the database and CANNOT be restored.`
     );
     if (!confirmed) return;
 
     try {
       const { error } = await supabase.from("articles").delete().eq("slug", article.slug);
       if (error) throw error;
-      setArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+
+      setTrashedArticles((prev) => prev.filter((a) => a.slug !== article.slug));
     } catch (err: any) {
-      alert(`Failed to delete article: ${err.message || "Unknown error"}`);
+      alert(`Failed to permanently delete article: ${err.message || "Unknown error"}`);
+      throw err;
     }
   };
 
@@ -338,6 +406,7 @@ function AdminDashboardPage() {
                 {(() => {
                   const currentItem = [
                     { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+                    { id: "restore", label: "Restore", icon: RotateCcw, count: trashedArticles.length, badge: trashedArticles.length > 0 ? `${trashedArticles.length}` : undefined },
                     { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
                     { id: "editor", label: "Story Editor", icon: PenLine },
                     { id: "profile", label: "Profile & Security", icon: User },
@@ -374,6 +443,7 @@ function AdminDashboardPage() {
                 <div className="space-y-0.5 mt-0.5">
                   {[
                     { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+                    { id: "restore", label: "Restore", icon: RotateCcw, count: trashedArticles.length, badge: trashedArticles.length > 0 ? `${trashedArticles.length}` : undefined },
                     { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
                     { id: "editor", label: "Story Editor", icon: PenLine },
                     { id: "profile", label: "Profile & Security", icon: User },
@@ -447,6 +517,7 @@ function AdminDashboardPage() {
           <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
             {[
               { id: "all_stories", label: "Newsroom Articles", icon: Globe, count: rows.length },
+              { id: "restore", label: "Restore", icon: RotateCcw, count: trashedArticles.length, badge: trashedArticles.length > 0 ? `${trashedArticles.length}` : undefined },
               { id: "authors", label: "Journalists & Team", icon: Users, badge: pendingCount > 0 ? `${pendingCount} Pending` : totalAuthorsCount ? `${totalAuthorsCount}` : undefined, isWarning: pendingCount > 0 },
               { id: "editor", label: "Story Editor", icon: PenLine },
               { id: "profile", label: "Profile & Security", icon: User },
@@ -717,7 +788,7 @@ function AdminDashboardPage() {
                             <button
                               onClick={() => handleDeleteArticle(article)}
                               className="inline-flex items-center gap-1 font-semibold text-red-600 hover:text-red-700 px-2 py-1 border border-red-200 hover:border-red-400 bg-red-50/60 hover:bg-red-50 transition-colors text-[0.72rem] sm:text-[0.75rem] rounded cursor-pointer"
-                              title="Delete Story from Forbes"
+                              title="Move Story to Trash (30 Days)"
                             >
                               <Trash2 className="h-3 w-3 shrink-0" /> Delete
                             </button>
@@ -730,6 +801,16 @@ function AdminDashboardPage() {
               )}
             </section>
           </>
+        )}
+
+        {tab === "restore" && (
+          <RestoreTab
+            trashedArticles={trashedArticles}
+            onRestore={handleRestoreArticle}
+            onPermanentDelete={handlePermanentDeleteArticle}
+            isAdmin={true}
+            onRefresh={fetchData}
+          />
         )}
 
         {tab === "authors" && (

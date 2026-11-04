@@ -18,6 +18,7 @@ import {
   Filter,
   ChevronDown,
   Check,
+  RotateCcw,
 } from "lucide-react";
 
 import { siteName } from "@/data/content";
@@ -33,6 +34,7 @@ import {
 import { PendingApprovalScreen } from "@/components/dashboard/PendingApprovalScreen";
 import { ProfileManager } from "@/components/dashboard/ProfileManager";
 import { Editor } from "@/components/dashboard/Editor";
+import { RestoreTab } from "@/components/dashboard/RestoreTab";
 
 export const Route = createFileRoute("/author-dashboard")({
   staticData: { sitemap: false },
@@ -81,9 +83,10 @@ function AuthorDashboardPage() {
   const [userFullName, setUserFullName] = useState<string>("");
   const [isApproved, setIsApproved] = useState<boolean>(true);
   const [articles, setArticles] = useState<ArticleRow[]>([]);
+  const [trashedArticles, setTrashedArticles] = useState<ArticleRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<"my_stories" | "newsroom_feed" | "editor" | "profile">("my_stories");
+  const [tab, setTab] = useState<"my_stories" | "newsroom_feed" | "restore" | "editor" | "profile">("my_stories");
   const [filter, setFilter] = useState<"All" | Status>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeArticle, setActiveArticle] = useState<any>(null);
@@ -143,14 +146,19 @@ function AuthorDashboardPage() {
       .select("*")
       .order("published_at", { ascending: false });
 
+    let rawList: any[] = [];
     if (artError) {
       const fallback = await supabase.from("articles").select("*");
       if (fallback.data) {
-        setArticles(mapArticleRows(fallback.data));
+        rawList = fallback.data;
       }
     } else if (articlesData) {
-      setArticles(mapArticleRows(articlesData));
+      rawList = articlesData;
     }
+
+    const mapped = mapArticleRows(rawList);
+    setArticles(mapped.filter((a) => !a.deleted_at));
+    setTrashedArticles(mapped.filter((a) => !!a.deleted_at));
     setLoading(false);
   };
 
@@ -169,6 +177,11 @@ function AuthorDashboardPage() {
   const myRows = useMemo(
     () => allRows.filter((r) => r.isOwner),
     [allRows],
+  );
+
+  const myTrashedArticles = useMemo(
+    () => trashedArticles.filter(isOwner),
+    [trashedArticles, session, userFullName],
   );
 
   const displayedRows = tab === "my_stories" ? myRows : allRows;
@@ -215,16 +228,86 @@ function AuthorDashboardPage() {
       return;
     }
     const confirmed = window.confirm(
-      `Are you sure you want to delete your article "${article.title}"?\n\nThis cannot be undone.`
+      `Move to Trash?\n\n"${article.title}" will be safely kept in Trash for 30 days.\nYou can restore it at any time from the Restore tab.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from("articles")
+        .update({ deleted_at: nowIso })
+        .eq("slug", article.slug);
+
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("deleted_at")) {
+          alert(
+            "Database Notice: The 'deleted_at' column is not yet present in your Supabase 'articles' table.\n\nPlease ask an administrator to run the migration script: supabase-add-trash-and-restore.sql in the Supabase SQL editor."
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+      setTrashedArticles((prev) => [
+        { ...article, deleted_at: nowIso },
+        ...prev.filter((a) => a.slug !== article.slug),
+      ]);
+    } catch (err: any) {
+      alert(`Failed to move article to trash: ${err.message || "Unknown error"}`);
+    }
+  };
+
+  const handleRestoreArticle = async (article: ArticleRow) => {
+    if (!isOwner(article)) {
+      alert("Permission denied: You can only restore articles that you authored.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("articles")
+        .update({ deleted_at: null })
+        .eq("slug", article.slug);
+
+      if (error) {
+        if (error.code === "PGRST204" || error.message?.includes("deleted_at")) {
+          alert(
+            "Database Notice: The 'deleted_at' column is not yet present in your Supabase 'articles' table.\n\nPlease run the SQL migration script: supabase-add-trash-and-restore.sql."
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setTrashedArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+      setArticles((prev) => [{ ...article, deleted_at: null }, ...prev]);
+    } catch (err: any) {
+      alert(`Failed to restore article: ${err.message || "Unknown error"}`);
+      throw err;
+    }
+  };
+
+  const handlePermanentDeleteArticle = async (article: ArticleRow) => {
+    if (!isOwner(article)) {
+      alert("Permission denied: You can only delete articles that you authored.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `PERMANENT DELETION:\n\nAre you sure you want to permanently delete "${article.title}"?\n\nThis article cannot be recovered.`
     );
     if (!confirmed) return;
 
     try {
       const { error } = await supabase.from("articles").delete().eq("slug", article.slug);
       if (error) throw error;
-      setArticles((prev) => prev.filter((a) => a.slug !== article.slug));
+
+      setTrashedArticles((prev) => prev.filter((a) => a.slug !== article.slug));
     } catch (err: any) {
-      alert(`Failed to delete article: ${err.message || "Unknown error"}`);
+      alert(`Failed to delete permanently: ${err.message || "Unknown error"}`);
+      throw err;
     }
   };
 
@@ -353,8 +436,9 @@ function AuthorDashboardPage() {
                 {(() => {
                   const currentItem = [
                     { id: "my_stories", label: "My Stories", icon: BookOpen, count: myRows.length },
-                    { id: "editor", label: "Compose Story", icon: PenLine },
+                    { id: "restore", label: "Restore", icon: RotateCcw, count: myTrashedArticles.length, badge: myTrashedArticles.length > 0 ? `${myTrashedArticles.length}` : undefined },
                     { id: "newsroom_feed", label: "Newsroom Feed", icon: Globe, count: allRows.length },
+                    { id: "editor", label: "Compose Story", icon: PenLine },
                     { id: "profile", label: "My Profile & Security", icon: User },
                   ].find((t) => t.id === tab) || { id: "my_stories", label: "My Stories", icon: BookOpen, count: myRows.length };
                   const Icon = currentItem.icon;
@@ -362,11 +446,15 @@ function AuthorDashboardPage() {
                     <>
                       <Icon className="h-3.5 w-3.5 text-red-500 shrink-0" />
                       <span className="truncate font-semibold">{currentItem.label}</span>
-                      {typeof currentItem.count === "number" && (
+                      {currentItem.badge ? (
+                        <span className="rounded-full bg-red-600 text-white px-1.5 py-0.5 text-[0.6rem] font-bold leading-none shrink-0">
+                          {currentItem.badge}
+                        </span>
+                      ) : typeof currentItem.count === "number" ? (
                         <span className="rounded-full bg-red-600 text-white px-1.5 py-0.5 text-[0.6rem] font-bold leading-none shrink-0">
                           {currentItem.count}
                         </span>
-                      )}
+                      ) : null}
                     </>
                   );
                 })()}
@@ -383,8 +471,9 @@ function AuthorDashboardPage() {
                 <div className="space-y-0.5 mt-0.5">
                   {[
                     { id: "my_stories", label: "My Stories", icon: BookOpen, count: myRows.length },
-                    { id: "editor", label: "Compose Story", icon: PenLine },
+                    { id: "restore", label: "Restore", icon: RotateCcw, count: myTrashedArticles.length, badge: myTrashedArticles.length > 0 ? `${myTrashedArticles.length}` : undefined },
                     { id: "newsroom_feed", label: "Newsroom Feed", icon: Globe, count: allRows.length },
+                    { id: "editor", label: "Compose Story", icon: PenLine },
                     { id: "profile", label: "My Profile & Security", icon: User },
                   ].map((item) => {
                     const Icon = item.icon;
@@ -411,13 +500,19 @@ function AuthorDashboardPage() {
                           <span className="truncate">{item.label}</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          {typeof item.count === "number" && (
+                          {item.badge ? (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold leading-none ${
+                              isActive ? "bg-red-600 text-white" : "bg-zinc-100 text-zinc-700 border border-zinc-200"
+                            }`}>
+                              {item.badge}
+                            </span>
+                          ) : typeof item.count === "number" ? (
                             <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold leading-none ${
                               isActive ? "bg-red-600 text-white" : "bg-zinc-100 text-zinc-700 border border-zinc-200"
                             }`}>
                               {item.count}
                             </span>
-                          )}
+                          ) : null}
                           {isActive && <Check className="h-3.5 w-3.5 text-red-500 ml-0.5" />}
                         </div>
                       </button>
@@ -446,8 +541,9 @@ function AuthorDashboardPage() {
           <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1 py-1 -mx-1 px-1">
             {[
               { id: "my_stories", label: "My Stories", icon: BookOpen, count: myRows.length },
-              { id: "editor", label: "Compose Story", icon: PenLine },
+              { id: "restore", label: "Restore", icon: RotateCcw, count: myTrashedArticles.length, badge: myTrashedArticles.length > 0 ? `${myTrashedArticles.length}` : undefined },
               { id: "newsroom_feed", label: "Newsroom Feed", icon: Globe, count: allRows.length },
+              { id: "editor", label: "Compose Story", icon: PenLine },
               { id: "profile", label: "My Profile & Security", icon: User },
             ].map((item) => {
               const Icon = item.icon;
@@ -469,7 +565,15 @@ function AuthorDashboardPage() {
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="whitespace-nowrap">{item.label}</span>
-                  {typeof item.count === "number" && (
+                  {item.badge ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none shrink-0 ${
+                        isActive ? "bg-red-600 text-white" : "bg-zinc-200 text-zinc-800"
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : typeof item.count === "number" ? (
                     <span
                       className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold leading-none shrink-0 ${
                         isActive ? "bg-red-600 text-white" : "bg-zinc-200 text-zinc-800"
@@ -477,7 +581,7 @@ function AuthorDashboardPage() {
                     >
                       {item.count}
                     </span>
-                  )}
+                  ) : null}
                 </button>
               );
             })}
@@ -711,7 +815,7 @@ function AuthorDashboardPage() {
                               <button
                                 onClick={() => handleDeleteArticle(article)}
                                 className="inline-flex items-center gap-1 font-semibold text-red-600 hover:text-red-700 px-2 py-1 border border-red-200 hover:border-red-400 bg-red-50/60 hover:bg-red-50 transition-colors text-[0.72rem] sm:text-[0.75rem] rounded cursor-pointer"
-                                title="Delete Your Story"
+                                title="Move Story to Trash (30 Days)"
                               >
                                 <Trash2 className="h-3 w-3 shrink-0" /> Delete
                               </button>
@@ -738,6 +842,16 @@ function AuthorDashboardPage() {
               )}
             </section>
           </>
+        )}
+
+        {tab === "restore" && (
+          <RestoreTab
+            trashedArticles={myTrashedArticles}
+            onRestore={handleRestoreArticle}
+            onPermanentDelete={handlePermanentDeleteArticle}
+            isAdmin={false}
+            onRefresh={fetchData}
+          />
         )}
 
         {tab === "editor" && (

@@ -18,7 +18,9 @@ export const Route = createFileRoute("/category/$category")({
       .ilike("category", match)
       .order("created_at", { ascending: false });
 
-    const articles: Article[] = (rows || []).map((row: any) => ({
+    const activeRows = (rows || []).filter((row: any) => !row.deleted_at);
+
+    const articles: Article[] = activeRows.map((row: any) => ({
       slug: row.slug,
       title: row.title,
       deck: row.excerpt,

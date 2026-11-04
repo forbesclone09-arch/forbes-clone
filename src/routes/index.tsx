@@ -32,11 +32,13 @@ export const Route = createFileRoute("/")({
       .select("*")
       .order("created_at", { ascending: false });
     
-    if (error || !data || data.length === 0) {
+    const activeData = (data || []).filter((row: any) => !row.deleted_at);
+    
+    if (error || activeData.length === 0) {
       return { articles: [] as Article[] };
     }
 
-    const mappedArticles: Article[] = data.map((row: any) => ({
+    const mappedArticles: Article[] = activeData.map((row: any) => ({
       slug: row.slug,
       title: row.title,
       deck: row.excerpt,
