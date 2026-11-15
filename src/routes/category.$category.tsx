@@ -26,9 +26,11 @@ export const Route = createFileRoute("/category/$category")({
       deck: row.excerpt,
       category: row.category as CategoryName,
       author: { name: row.author, title: "Staff Writer" },
-      published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      published: new Date(row.published_at || Date.now()).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
       readTime: parseInt(row.read_time) || 5,
       image: row.image_url,
+      aspect_ratio: row.aspect_ratio || (row.category === "Cover Feature" || row.is_cover ? "3:4" : undefined),
+      is_cover: !!(row.is_cover || row.category === "Cover Feature"),
     }));
 
     return { category: match as CategoryName, articles };

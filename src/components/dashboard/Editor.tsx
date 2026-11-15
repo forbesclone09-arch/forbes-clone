@@ -61,6 +61,18 @@ export function Editor({
 
   // Cover image states
   const [imageUrl, setImageUrl] = useState<string>(initialArticle?.image || "");
+  const [aspectRatio, setAspectRatio] = useState<"4:3" | "3:4">(
+    initialArticle?.aspect_ratio === "3:4" ||
+    initialArticle?.is_cover ||
+    initialArticle?.category === "Cover Feature"
+      ? "3:4"
+      : "4:3"
+  );
+  const [isCoverFeature, setIsCoverFeature] = useState<boolean>(
+    initialArticle?.is_cover ||
+    initialArticle?.category === "Cover Feature" ||
+    initialArticle?.aspect_ratio === "3:4"
+  );
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
   const [urlInput, setUrlInput] = useState<string>("");
@@ -68,6 +80,18 @@ export function Editor({
   const [uploadError, setUploadError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const checkImageAspectRatio = (url: string) => {
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalHeight > img.naturalWidth * 1.12) {
+        setAspectRatio("3:4");
+        setIsCoverFeature(true);
+      }
+    };
+    img.src = url;
+  };
 
   // Inline body image modal states
   const [showInlineImageModal, setShowInlineImageModal] = useState<boolean>(false);
@@ -141,6 +165,7 @@ export function Editor({
     try {
       const url = await uploadImageFile(file);
       setImageUrl(url);
+      checkImageAspectRatio(url);
     } catch (err: any) {
       setUploadError(err.message || "Failed to upload image");
     } finally {
@@ -170,6 +195,7 @@ export function Editor({
     const trimmed = urlInput.trim();
     if (trimmed) {
       setImageUrl(trimmed);
+      checkImageAspectRatio(trimmed);
       setUrlInput("");
     }
   };
@@ -408,6 +434,8 @@ export async function initializeComputeSovereignty(region: "eu-central") {
       is_premium: false,
       author_id: authorId,
       author_email: authorEmail,
+      aspect_ratio: aspectRatio,
+      is_cover: isCoverFeature || aspectRatio === "3:4" || category === "Cover Feature",
     };
 
     let saveError: any = null;
@@ -417,9 +445,11 @@ export async function initializeComputeSovereignty(region: "eu-central") {
       const res = await supabase.from("articles").insert(articleData);
       saveError = res.error;
 
-      // Schema fallback if author_id or author_email columns are missing
-      if (saveError && (saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
+      // Schema fallback if optional columns are missing
+      if (saveError && (saveError.message.includes("aspect_ratio") || saveError.message.includes("is_cover") || saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
         const fallbackData = { ...articleData };
+        delete fallbackData.aspect_ratio;
+        delete fallbackData.is_cover;
         delete fallbackData.author_id;
         delete fallbackData.author_email;
         const retryRes = await supabase.from("articles").insert(fallbackData);
@@ -433,8 +463,10 @@ export async function initializeComputeSovereignty(region: "eu-central") {
         .eq("slug", initialArticle.slug);
       saveError = res.error;
 
-      if (saveError && (saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
+      if (saveError && (saveError.message.includes("aspect_ratio") || saveError.message.includes("is_cover") || saveError.message.includes("author_id") || saveError.message.includes("author_email") || (saveError as any).code === "42703")) {
         const fallbackData = { ...articleData };
+        delete fallbackData.aspect_ratio;
+        delete fallbackData.is_cover;
         delete fallbackData.author_id;
         delete fallbackData.author_email;
         const retryRes = await supabase
@@ -873,6 +905,55 @@ export async function initializeComputeSovereignty(region: "eu-central") {
             </div>
           </div>
 
+          {/* Format & Aspect Ratio Selector */}
+          <div className="mb-3 rounded border border-rule bg-secondary/40 p-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  Format & Aspect Ratio
+                </p>
+                <p className="text-[0.7rem] text-ink-soft">
+                  {aspectRatio === "3:4"
+                    ? "📕 Magazine Cover (3:4) — Shows full uncropped cover on homepage & article."
+                    : "🖼️ Standard Landscape (4:3 / 16:9)"}
+                </p>
+              </div>
+              <div className="flex shrink-0 rounded border border-rule bg-background p-0.5 text-xs font-semibold self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAspectRatio("4:3");
+                    setIsCoverFeature(false);
+                  }}
+                  className={`px-2.5 py-1 rounded-sm transition-colors ${
+                    aspectRatio === "4:3"
+                      ? "bg-foreground text-background shadow-xs"
+                      : "text-ink-soft hover:text-foreground"
+                  }`}
+                >
+                  Standard (4:3)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAspectRatio("3:4");
+                    setIsCoverFeature(true);
+                    if (category === "Business" || !category) {
+                      setCategory("Cover Feature");
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-sm transition-colors ${
+                    aspectRatio === "3:4"
+                      ? "bg-red-600 text-white shadow-xs"
+                      : "text-ink-soft hover:text-foreground"
+                  }`}
+                >
+                  📕 Magazine (3:4)
+                </button>
+              </div>
+            </div>
+          </div>
+
           <input
             type="file"
             ref={fileInputRef}
@@ -886,12 +967,25 @@ export async function initializeComputeSovereignty(region: "eu-central") {
           />
 
           {imageUrl ? (
-            <div className="relative group border border-rule overflow-hidden">
+            <div className={`relative group border border-rule overflow-hidden ${
+              aspectRatio === "3:4"
+                ? "aspect-[3/4] max-w-[280px] mx-auto rounded-sm shadow-md ring-1 ring-black/10 bg-zinc-950/5"
+                : "aspect-[4/3] w-full"
+            }`}>
               <img
                 src={imageUrl}
                 alt="Cover Preview"
-                className="w-full aspect-[4/3] object-cover"
+                className={`w-full h-full ${
+                  aspectRatio === "3:4" ? "object-contain" : "object-cover"
+                }`}
               />
+              {aspectRatio === "3:4" && (
+                <div className="absolute top-2 left-2 pointer-events-none">
+                  <span className="bg-red-600 text-white text-[0.62rem] font-bold uppercase tracking-wider px-2 py-0.5 shadow-sm">
+                    3:4 Magazine Cover
+                  </span>
+                </div>
+              )}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
                 <button
                   type="button"

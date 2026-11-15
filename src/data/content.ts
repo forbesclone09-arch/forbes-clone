@@ -13,7 +13,7 @@ import businessCapital from "@/assets/business-capital.jpg";
 import techSecurity from "@/assets/tech-security.jpg";
 import techWearables from "@/assets/tech-wearables.jpg";
 
-export type CategoryName = "Business" | "Tech" | "Startups";
+export type CategoryName = "Business" | "Tech" | "Startups" | "Cover Feature";
 
 export interface Author {
   name: string;
@@ -29,12 +29,14 @@ export interface Article {
   published: string;
   readTime: number;
   image: string;
+  aspect_ratio?: "3:4" | "4:3" | "16:9" | string;
+  is_cover?: boolean;
 }
 
 export const siteName = "Forbes Germany";
 export const siteTagline = "Business, Technology & the leaders building what's next.";
 
-export const navCategories: CategoryName[] = ["Business", "Tech", "Startups"];
+export const navCategories: CategoryName[] = ["Business", "Tech", "Startups", "Cover Feature"];
 
 export const authors = {
   nadiaRahman: { name: "Nadia Rahman", title: "Senior Correspondent, Global Commerce" },

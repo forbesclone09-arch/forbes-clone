@@ -18,6 +18,8 @@ export interface ArticleRow {
   body: any[];
   views: number;
   deleted_at?: string | null;
+  aspect_ratio?: string;
+  is_cover?: boolean;
 }
 
 export const TRASH_RETENTION_DAYS = 30;
@@ -73,6 +75,8 @@ export function mapArticleRows(rows: any[]): ArticleRow[] {
     body: row.body,
     views: row.views || 0,
     deleted_at: row.deleted_at || null,
+    aspect_ratio: row.aspect_ratio || (row.category === "Cover Feature" || row.is_cover ? "3:4" : undefined),
+    is_cover: !!(row.is_cover || row.category === "Cover Feature"),
   }));
 }
 

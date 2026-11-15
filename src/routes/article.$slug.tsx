@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, BookOpen } from "lucide-react";
 
 import { ArticleCard, CategoryKicker } from "@/components/article-card";
 import { allArticles, siteName, type Author } from "@/data/content";
@@ -26,7 +27,9 @@ export const Route = createFileRoute("/article/$slug")({
         published: new Date(row.published_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
         readTime: parseInt(row.read_time) || 5,
         image: row.image_url,
-        body: row.body // Array of paragraphs from DB
+        body: row.body, // Array of paragraphs from DB
+        aspect_ratio: row.aspect_ratio || (row.category === "Cover Feature" || row.is_cover ? "3:4" : undefined),
+        is_cover: !!(row.is_cover || row.category === "Cover Feature"),
       };
       return { article };
     }
@@ -44,6 +47,8 @@ export const Route = createFileRoute("/article/$slug")({
         published: staticArticle.published,
         readTime: staticArticle.readTime,
         image: staticArticle.image,
+        aspect_ratio: staticArticle.aspect_ratio || (staticArticle.category === "Cover Feature" || staticArticle.is_cover ? "3:4" : undefined),
+        is_cover: !!(staticArticle.is_cover || staticArticle.category === "Cover Feature"),
         body: fallback?.paragraphs
           ? fallback.paragraphs.map((content) => ({ type: "paragraph", content }))
           : [{ type: "paragraph", content: staticArticle.deck }],
@@ -106,8 +111,24 @@ function ArticlePage() {
   const { article } = Route.useLoaderData();
   const bodyBlocks = article.body || [];
   
+  const isExplicitCover =
+    article.aspect_ratio === "3:4" ||
+    article.is_cover ||
+    article.category === "Cover Feature" ||
+    article.category?.toLowerCase() === "magazine cover";
+
+  const [isPortrait, setIsPortrait] = useState<boolean>(isExplicitCover);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    if (naturalHeight > naturalWidth * 1.12) {
+      setIsPortrait(true);
+    }
+  };
+
+  const isCoverStyle = isExplicitCover || isPortrait;
+  
   // To avoid loading another query just for related, we can just omit them or load them simply
-  // Wait, I can't easily run a hook for related without useEffect, but I don't need related for MVP, or I can just show nothing for now. Let's just leave related empty since the loader doesn't fetch them.
   const related: any[] = [];
 
   return (
@@ -124,7 +145,14 @@ function ArticlePage() {
 
       <header className="mt-6 grid gap-6 border-b border-rule pb-8 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <CategoryKicker category={article.category as any} />
+          <div className="flex items-center gap-2">
+            <CategoryKicker category={article.category as any} />
+            {isCoverStyle && (
+              <span className="inline-flex items-center gap-1 bg-red-600 px-2.5 py-0.5 text-[0.68rem] font-bold uppercase tracking-wider text-white shadow-sm">
+                <BookOpen className="size-3" /> Magazine Cover Feature
+              </span>
+            )}
+          </div>
           <h1 className="headline mt-3 text-[2.1rem] text-foreground sm:text-[2.9rem] lg:text-[3.4rem]">
             {article.title}
           </h1>
@@ -145,17 +173,37 @@ function ArticlePage() {
         </div>
       </header>
 
-      <figure className="mt-8">
-        <img
-          src={article.image}
-          alt={article.title}
-          fetchPriority="high"
-          className="aspect-[16/9] w-full object-cover sm:aspect-[21/9]"
-        />
-        <figcaption className="mt-3 border-b border-rule pb-5 text-[0.75rem] text-ink-soft">
-          Photographed for {siteName}. {article.published}.
-        </figcaption>
-      </figure>
+      {isCoverStyle ? (
+        <figure className="mt-10 flex flex-col items-center">
+          <div className="relative mx-auto w-full max-w-[500px] overflow-hidden rounded-sm bg-neutral-900/5 p-2 sm:p-3 shadow-2xl ring-1 ring-black/10 dark:ring-white/10">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-sm bg-neutral-950/5">
+              <img
+                src={article.image}
+                alt={article.title}
+                fetchPriority="high"
+                onLoad={handleImageLoad}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          </div>
+          <figcaption className="mt-4 w-full text-center border-b border-rule pb-5 text-[0.78rem] text-ink-soft">
+            <span className="font-semibold text-foreground">{siteName} Magazine Cover Feature</span> &middot; {article.published}
+          </figcaption>
+        </figure>
+      ) : (
+        <figure className="mt-8">
+          <img
+            src={article.image}
+            alt={article.title}
+            fetchPriority="high"
+            onLoad={handleImageLoad}
+            className="aspect-[16/9] w-full object-cover sm:aspect-[21/9]"
+          />
+          <figcaption className="mt-3 border-b border-rule pb-5 text-[0.75rem] text-ink-soft">
+            Photographed for {siteName}. {article.published}.
+          </figcaption>
+        </figure>
+      )}
 
       <div className="mt-10 grid gap-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
