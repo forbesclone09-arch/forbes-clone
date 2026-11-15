@@ -51,6 +51,19 @@ const bodies: Record<CategoryName, ArticleBody> = {
     ],
     pullQuote: "By the time we started talking, saying no required an argument.",
   },
+  "Cover Feature": {
+    standfirst:
+      "A leader at the intersection of clinical oncology and machine learning strategy on why precision medicine is reaching its turning point.",
+    paragraphs: [
+      "In the rapidly evolving landscape of global biotechnology, leaders who can bridge the gap between clinical research, oncology drug development, and cutting-edge artificial intelligence are reshaping the future of healthcare.",
+      "Dr. Huma Qamar, Chief Medical Officer and healthcare strategist at Alma Global Consultants, is at the forefront of this transformation. With decades of pioneering clinical trial designs and novel therapeutics, her work explores how machine learning models accelerate oncological drug discovery and streamline patient access worldwide.",
+      "As healthcare systems around the globe navigate rising complexities in clinical protocols, Alma Global Consultants brings precision medicine and strategic regulatory consulting together to deliver therapies faster and with greater efficacy.",
+      "\"The true potential of biotechnology lies not just in the laboratory, but in how intelligently we translate discoveries into real-world clinical outcomes,\" Dr. Qamar notes. \"By integrating artificial intelligence into trial workflows, we can identify patient responses earlier and reduce trial cycle times dramatically.\"",
+      "The global impact of these methodologies is already resonating across international research institutes, positioning this new paradigm as a benchmark for contemporary pharmaceutical development."
+    ],
+    pullQuote:
+      "The true potential of biotechnology lies in how intelligently we translate discoveries into real-world clinical outcomes."
+  },
 };
 
 export function getBody(category: CategoryName): ArticleBody {

@@ -12,6 +12,7 @@ import techRobotics from "@/assets/tech-robotics.jpg";
 import businessCapital from "@/assets/business-capital.jpg";
 import techSecurity from "@/assets/tech-security.jpg";
 import techWearables from "@/assets/tech-wearables.jpg";
+import humaQamarCover from "@/assets/huma-qamar-cover.jpg";
 
 export type CategoryName = "Business" | "Tech" | "Startups" | "Cover Feature";
 
@@ -284,7 +285,29 @@ export const mostRead: MostReadItem[] = [
   },
 ];
 
-export const allArticles: Article[] = [featuredArticle, ...recentArticles, ...categoryFeatures];
+export const coverArticles: Article[] = [
+  {
+    slug: "biotech-executive-dr-huma-qamar-turns-to-ai-and-healthcare-strategy",
+    title:
+      "Biotech Executive Dr. Huma Qamar Turns To AI And Healthcare Strategy With Alma Global Consultants",
+    deck:
+      "Inside the revolutionary convergence of artificial intelligence, clinical oncology, and global bio-strategy led by Dr. Huma Qamar.",
+    category: "Cover Feature",
+    author: { name: "Editorial Board", title: "Special Editions Editor" },
+    published: "October 10, 2026",
+    readTime: 8,
+    image: humaQamarCover,
+    aspect_ratio: "3:4",
+    is_cover: true,
+  },
+];
+
+export const allArticles: Article[] = [
+  featuredArticle,
+  ...coverArticles,
+  ...recentArticles,
+  ...categoryFeatures,
+];
 
 export function articlesByCategory(category: CategoryName): Article[] {
   return allArticles.filter((article) => article.category === category);

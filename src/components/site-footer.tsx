@@ -2,18 +2,19 @@ import { useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 
-import { categoryFeatures, featuredArticle, recentArticles, siteName } from "@/data/content";
+import { categoryFeatures, coverArticles, featuredArticle, recentArticles, siteName, type CategoryName } from "@/data/content";
 import logoWhite from "@/assets/forbes-logo-white.png";
 
 type FooterLink =
   | { label: string; to: "/about" | "/contact" | "/privacy" | "/signup" | "/" }
-  | { label: string; category: "Business" | "Tech" | "Startups" };
+  | { label: string; category: CategoryName };
 
 const columns: { title: string; links: FooterLink[] }[] = [
   {
     title: "Sections",
     links: [
       { label: "News", to: "/" },
+      { label: "Cover Feature", category: "Cover Feature" },
       { label: "Business", category: "Business" },
       { label: "Tech", category: "Tech" },
       { label: "Startups", category: "Startups" },
@@ -55,7 +56,7 @@ const inputClass =
 function FooterNavLink({ link }: { link: FooterLink }) {
   if ("category" in link) {
     return (
-      <Link to="/category/$category" params={{ category: link.category.toLowerCase() }} className={linkClass}>
+      <Link to="/category/$category" params={{ category: link.category.toLowerCase().replace(/\s+/g, "-") }} className={linkClass}>
         {link.label}
       </Link>
     );
@@ -161,7 +162,7 @@ export function SiteFooter() {
         <div className="mt-20 grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4 lg:col-start-3">
             <div className="flex items-end gap-6">
-              <Cover image={featuredArticle.image} title={featuredArticle.title} className="relative aspect-[3/4] w-36 shrink-0" />
+              <Cover image={(coverArticles[0] ?? featuredArticle).image} title={(coverArticles[0] ?? featuredArticle).title} className="relative aspect-[3/4] w-36 shrink-0" />
               <div className="relative h-52 w-44 shrink-0">
                 <Cover image={(categoryFeatures[0] ?? featuredArticle).image} title={(categoryFeatures[0] ?? featuredArticle).title} className="absolute top-0 right-0 aspect-[3/4] w-24" />
                 <Cover image={(recentArticles[0] ?? featuredArticle).image} title={(recentArticles[0] ?? featuredArticle).title} className="absolute bottom-0 left-0 aspect-[3/4] w-24" />

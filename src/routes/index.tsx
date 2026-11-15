@@ -4,7 +4,7 @@ import { ArticleCard, SectionHeading } from "@/components/article-card";
 import { CategoryMosaic } from "@/components/category-mosaic";
 import { FeaturedHero } from "@/components/featured-hero";
 import { MostRead } from "@/components/most-read";
-import { recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
+import { coverArticles as defaultCoverArticles, recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/")({
@@ -64,36 +64,20 @@ function HomePage() {
     ? [...dynamicRecent, ...recentArticles.filter((ra) => !dynamicRecent.some((dr) => dr.slug === ra.slug))].slice(0, 6)
     : recentArticles;
 
-  const coverArticles = articles.filter(
+  const dbCoverArticles = articles.filter(
     (a) => a.is_cover || a.category === "Cover Feature" || a.aspect_ratio === "3:4"
   );
+  const coverArticles = dbCoverArticles.length > 0 ? dbCoverArticles : defaultCoverArticles;
 
   return (
     <>
       <FeaturedHero article={featured} />
 
       <div className="mx-auto w-full max-w-[1240px] px-5 pb-4 sm:px-8">
-        <section aria-label="Recent news" className="mt-16">
-          <div className="grid gap-x-10 gap-y-12 lg:grid-cols-12">
-            <div className="lg:col-span-8">
-              <SectionHeading title="Recent News" kicker="Updated hourly" />
-              <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2">
-                {displayRecent.map((article) => (
-                  <ArticleCard key={article.slug} article={article} />
-                ))}
-              </div>
-            </div>
-
-            <div className="lg:col-span-4">
-              <MostRead articles={articles} />
-            </div>
-          </div>
-        </section>
-
         {/* Magazine Cover Special Feature Section */}
         {coverArticles.length > 0 && (
-          <section aria-label="Magazine Cover Feature" className="mt-16 sm:mt-20 border-t-2 border-foreground pt-10">
-            <div className="mb-8 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-3">
+          <section aria-label="Magazine Cover Feature" className="mt-10 sm:mt-14 border-t-2 border-foreground pt-8">
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-3">
               <div>
                 <span className="kicker text-red-600 font-bold tracking-wider">Special Feature</span>
                 <h2 className="headline mt-1 text-[1.75rem] text-foreground sm:text-[2.2rem]">
@@ -112,6 +96,23 @@ function HomePage() {
             </div>
           </section>
         )}
+
+        <section aria-label="Recent news" className="mt-16">
+          <div className="grid gap-x-10 gap-y-12 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <SectionHeading title="Recent News" kicker="Updated hourly" />
+              <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2">
+                {displayRecent.map((article) => (
+                  <ArticleCard key={article.slug} article={article} />
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-4">
+              <MostRead articles={articles} />
+            </div>
+          </div>
+        </section>
 
         <CategoryMosaic category="Business" articles={articles} />
         <CategoryMosaic category="Tech" articles={articles} />

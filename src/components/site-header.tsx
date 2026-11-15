@@ -98,7 +98,7 @@ export function SiteHeader() {
       <section className="min-w-0 border-t border-background/20 pt-5">
         <Link
           to="/category/$category"
-          params={{ category: category.toLowerCase() }}
+          params={{ category: category.toLowerCase().replace(/\s+/g, "-") }}
           onClick={closeMenu}
           className="group mb-4 inline-flex items-center gap-2 text-base font-semibold text-background hover:text-brand"
         >
@@ -133,7 +133,7 @@ export function SiteHeader() {
           </Button>
           <nav className="hidden items-center gap-5 lg:flex" aria-label="Categories">
             {!isDashboard && navCategories.map((category) => (
-              <Link key={category} to="/category/$category" params={{ category: category.toLowerCase() }} onClick={closeMenu} className="text-[0.7rem] font-semibold uppercase text-background/80 hover:text-background">{category}</Link>
+              <Link key={category} to="/category/$category" params={{ category: category.toLowerCase().replace(/\s+/g, "-") }} onClick={closeMenu} className="text-[0.7rem] font-semibold uppercase text-background/80 hover:text-background">{category}</Link>
             ))}
           </nav>
           </div>

@@ -1,14 +1,17 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { ArticleCard, SectionHeading } from "@/components/article-card";
-import { navCategories, siteName, type CategoryName, type Article } from "@/data/content";
+import { articlesByCategory, navCategories, siteName, type CategoryName, type Article } from "@/data/content";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/category/$category")({
   staticData: { sitemap: true },
   loader: async ({ params }) => {
+    const rawParam = decodeURIComponent(params.category).toLowerCase().trim();
     const match = navCategories.find(
-      (category) => category.toLowerCase() === params.category.toLowerCase(),
+      (category) =>
+        category.toLowerCase() === rawParam ||
+        category.toLowerCase().replace(/\s+/g, "-") === rawParam,
     );
     if (!match) throw notFound();
 
@@ -20,7 +23,7 @@ export const Route = createFileRoute("/category/$category")({
 
     const activeRows = (rows || []).filter((row: any) => !row.deleted_at);
 
-    const articles: Article[] = activeRows.map((row: any) => ({
+    const dbArticles: Article[] = activeRows.map((row: any) => ({
       slug: row.slug,
       title: row.title,
       deck: row.excerpt,
@@ -32,6 +35,8 @@ export const Route = createFileRoute("/category/$category")({
       aspect_ratio: row.aspect_ratio || (row.category === "Cover Feature" || row.is_cover ? "3:4" : undefined),
       is_cover: !!(row.is_cover || row.category === "Cover Feature"),
     }));
+
+    const articles = dbArticles.length > 0 ? dbArticles : articlesByCategory(match);
 
     return { category: match as CategoryName, articles };
   },
