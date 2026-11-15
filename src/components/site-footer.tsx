@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 
 import { categoryFeatures, featuredArticle, recentArticles, siteName } from "@/data/content";
+import logoWhite from "@/assets/forbes-logo-white.png";
 
 type FooterLink =
   | { label: string; to: "/about" | "/contact" | "/privacy" | "/signup" | "/" }
@@ -93,13 +94,12 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-[1240px] px-5 pt-16 pb-8 sm:px-8">
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-2">
-            <Link to="/" className="group flex items-baseline gap-2">
-              <span className="font-display text-4xl leading-none font-bold tracking-tight text-background">
-                Forbes
-              </span>
-              <span className="font-sans text-[0.7rem] font-bold tracking-[0.24em] uppercase text-brand">
-                Germany
-              </span>
+            <Link to="/" className="group inline-block" aria-label={`${siteName} home`}>
+              <img
+                src={logoWhite}
+                alt={siteName}
+                className="h-10 w-auto object-contain transition-opacity group-hover:opacity-90"
+              />
             </Link>
           </div>
 

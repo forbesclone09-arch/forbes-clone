@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 
 import { siteName } from "@/data/content";
+import logoBlack from "@/assets/forbes-logo-black.png";
 
 export function AuthShell({
   title,
@@ -14,22 +16,13 @@ export function AuthShell({
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col px-5 pb-4 sm:px-8">
       <div className="mx-auto flex w-full max-w-[560px] flex-1 flex-col py-16">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="grid h-7 w-7 shrink-0 place-items-center bg-foreground font-display text-[1.05rem] leading-none text-background font-bold"
-          >
-            F
-          </span>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-2xl leading-none font-bold tracking-tight">
-              Forbes
-            </span>
-            <span className="font-sans text-[0.65rem] font-bold tracking-[0.2em] uppercase text-brand">
-              Germany
-            </span>
-          </div>
-        </div>
+        <Link to="/" className="inline-block" aria-label={`${siteName} home`}>
+          <img
+            src={logoBlack}
+            alt={siteName}
+            className="h-8 w-auto object-contain"
+          />
+        </Link>
         <h1 className="headline mt-8 text-[2.1rem] text-foreground sm:text-[2.5rem]">{title}</h1>
         <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-soft">{intro}</p>
         {children}

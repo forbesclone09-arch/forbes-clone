@@ -4,6 +4,7 @@ import { PenLine, Lock, ArrowLeft, Eye, EyeOff, AlertCircle } from "lucide-react
 
 import { siteName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
+import logoWhite from "@/assets/forbes-logo-white.png";
 
 export const Route = createFileRoute("/author-login")({
   staticData: { sitemap: false },
@@ -80,20 +81,19 @@ function AuthorLoginPage() {
       {/* Top micro-bar */}
       <header className="border-b border-zinc-800/80 px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <span className="flex size-7 shrink-0 items-center justify-center bg-red-600 font-display font-black text-sm text-white rounded shadow-sm">
-            F
+          <Link to="/" className="flex items-center">
+            <img
+              src={logoWhite}
+              alt={siteName}
+              className="h-6 sm:h-7 w-auto object-contain"
+            />
+          </Link>
+          <span className="hidden sm:inline-flex text-[0.65rem] font-mono uppercase tracking-[0.2em] text-zinc-400 bg-zinc-900 border border-zinc-700/80 px-2 py-0.5 rounded whitespace-nowrap">
+            Author Studio
           </span>
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <span className="font-display text-base sm:text-lg font-bold tracking-tight text-white whitespace-nowrap">
-              Forbes Germany
-            </span>
-            <span className="hidden sm:inline-flex text-[0.65rem] font-mono uppercase tracking-[0.2em] text-zinc-400 bg-zinc-900 border border-zinc-700/80 px-2 py-0.5 rounded whitespace-nowrap">
-              Author Studio
-            </span>
-            <span className="sm:hidden text-[0.58rem] font-mono uppercase tracking-wider text-zinc-400 bg-zinc-900 border border-zinc-700/80 px-1.5 py-0.5 rounded font-bold shrink-0">
-              Journalist
-            </span>
-          </div>
+          <span className="sm:hidden text-[0.58rem] font-mono uppercase tracking-wider text-zinc-400 bg-zinc-900 border border-zinc-700/80 px-1.5 py-0.5 rounded font-bold shrink-0">
+            Journalist
+          </span>
         </div>
 
         <Link

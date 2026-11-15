@@ -23,6 +23,7 @@ import {
 
 import { navCategories, siteName } from "@/data/content";
 import { supabase } from "@/lib/supabase";
+import logoWhite from "@/assets/forbes-logo-white.png";
 import {
   type Status,
   statuses,
@@ -318,13 +319,14 @@ function AdminDashboardPage() {
         <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center justify-between px-3 sm:px-6 lg:px-8">
           {/* Left: Brand + Executive Badge */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="flex size-7 shrink-0 items-center justify-center bg-red-600 font-display font-black text-sm text-white rounded shadow-sm">
-              F
-            </span>
+            <Link to="/" className="flex items-center">
+              <img
+                src={logoWhite}
+                alt={siteName}
+                className="h-6 sm:h-7 w-auto object-contain"
+              />
+            </Link>
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-              <span className="font-display text-sm sm:text-base font-bold tracking-tight text-white whitespace-nowrap">
-                Forbes Germany
-              </span>
               <span className="hidden lg:inline-flex text-[0.62rem] font-mono uppercase tracking-[0.2em] text-red-400 border border-red-900/60 bg-red-950/40 px-2 py-0.5 rounded whitespace-nowrap">
                 Executive Control
               </span>

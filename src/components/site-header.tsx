@@ -5,20 +5,20 @@ import { ArrowRight, Bell, ChevronDown, Menu, Search, Settings2, X, LayoutDashbo
 import { allArticles, briefingItems, featuredArticle, mostRead, navCategories, recentArticles, siteName, type Article, type CategoryName } from "@/data/content";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import logoWhite from "@/assets/forbes-logo-white.png";
 
 function Wordmark() {
   return (
     <Link
       to="/"
-      className="group flex min-w-0 items-baseline gap-2"
+      className="group flex min-w-0 items-center py-1"
       aria-label={`${siteName} home`}
     >
-      <span className="font-display text-[1.85rem] sm:text-[2.25rem] font-bold tracking-[-0.03em] leading-none text-background group-hover:text-background/90 transition-colors">
-        Forbes
-      </span>
-      <span className="font-sans text-[0.68rem] sm:text-[0.75rem] font-bold tracking-[0.24em] uppercase text-brand">
-        Germany
-      </span>
+      <img
+        src={logoWhite}
+        alt={siteName}
+        className="h-8 sm:h-9 w-auto object-contain transition-opacity group-hover:opacity-90"
+      />
     </Link>
   );
 }
@@ -246,7 +246,7 @@ export function SiteHeader() {
           <div className="fixed inset-0 top-[64px] bg-foreground/35" onClick={() => setAccountOpen(false)} aria-hidden="true" />
           <aside id="account-panel" aria-label="Account panel" className="fixed bottom-0 right-0 top-0 z-[60] w-full max-w-[440px] overflow-y-auto bg-foreground px-7 pb-10 text-background sm:px-9">
             <div className="flex h-[68px] items-center justify-between">
-              <span className="font-display text-3xl font-semibold" aria-label={siteName}>M</span>
+              <img src={logoWhite} alt={siteName} className="h-7 w-auto object-contain" />
               <Button type="button" variant="ghost" size="icon" onClick={() => setAccountOpen(false)} aria-label="Close account panel" className="size-8 rounded-full bg-background/10 text-background hover:bg-background/20 hover:text-background"><X className="size-4" /></Button>
             </div>
             <div role="tablist" aria-label="Account views" className="flex items-stretch gap-4 border-b border-background/20 sm:gap-6">
