@@ -77,16 +77,11 @@ function HomePage() {
         {/* Magazine Cover Special Feature Section */}
         {coverArticles.length > 0 && (
           <section aria-label="Magazine Cover Feature" className="mt-10 sm:mt-14 border-t-2 border-foreground pt-8">
-            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4 border-b border-rule pb-3">
-              <div>
-                <span className="kicker text-red-600 font-bold tracking-wider">Special Feature</span>
-                <h2 className="headline mt-1 text-[1.75rem] text-foreground sm:text-[2.2rem]">
-                  Forbes Magazine Covers
-                </h2>
-              </div>
-              <span className="text-xs font-mono uppercase tracking-wider text-ink-soft">
-                3:4 Portrait Issue Editions
-              </span>
+            <div className="mb-6 border-b border-rule pb-3">
+              <span className="kicker text-red-600 font-bold tracking-wider">Special Feature</span>
+              <h2 className="headline mt-1 text-[1.75rem] text-foreground sm:text-[2.2rem]">
+                Forbes Magazine Covers
+              </h2>
             </div>
             
             <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">

@@ -147,7 +147,7 @@ function ArticlePage() {
         <div className="lg:col-span-8">
           <div className="flex items-center gap-2">
             <CategoryKicker category={article.category as any} />
-            {isCoverStyle && (
+            {isCoverStyle && article.category !== "Cover Feature" && (
               <span className="inline-flex items-center gap-1 bg-red-600 px-2.5 py-0.5 text-[0.68rem] font-bold uppercase tracking-wider text-white shadow-sm">
                 <BookOpen className="size-3" /> Magazine Cover Feature
               </span>

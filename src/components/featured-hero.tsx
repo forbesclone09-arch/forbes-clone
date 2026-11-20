@@ -56,9 +56,6 @@ export function FeaturedHero({ article }: { article?: Article } = {}) {
                 <span className="inline-flex items-center gap-1 bg-red-600 px-2.5 py-0.5 text-[0.68rem] font-bold uppercase tracking-wider text-white shadow-sm">
                   <BookOpen className="size-3" /> Magazine Cover Feature
                 </span>
-                <span className="text-[0.72rem] font-mono tracking-[0.15em] text-zinc-400 uppercase">
-                  3:4 Issue Edition
-                </span>
               </div>
 
               <h1

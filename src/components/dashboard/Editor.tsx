@@ -982,7 +982,7 @@ export async function initializeComputeSovereignty(region: "eu-central") {
               {aspectRatio === "3:4" && (
                 <div className="absolute top-2 left-2 pointer-events-none">
                   <span className="bg-red-600 text-white text-[0.62rem] font-bold uppercase tracking-wider px-2 py-0.5 shadow-sm">
-                    3:4 Magazine Cover
+                    Cover Feature
                   </span>
                 </div>
               )}

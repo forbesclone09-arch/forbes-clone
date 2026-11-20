@@ -104,14 +104,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
           params={{ slug: article.slug }}
           className="flex flex-1 flex-col"
         >
-          <div className="flex items-center gap-2">
-            <CategoryKicker category={article.category} />
-            {isCoverStyle && (
-              <span className="text-[0.65rem] font-mono uppercase tracking-wider text-red-600 font-semibold">
-                3:4 Magazine
-              </span>
-            )}
-          </div>
+          <CategoryKicker category={article.category} />
           <h3 className="headline mt-2 text-[1.2rem] text-foreground transition-colors group-hover:text-brand sm:text-[1.32rem]">
             {article.title}
           </h3>
@@ -148,14 +141,7 @@ export function ArticleRow({ article }: { article: Article }) {
   return (
     <article className="group grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-rule py-5 last:border-b-0">
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <CategoryKicker category={article.category} />
-          {isCoverStyle && (
-            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-red-600 font-semibold">
-              Cover
-            </span>
-          )}
-        </div>
+        <CategoryKicker category={article.category} />
         <Link to="/article/$slug" params={{ slug: article.slug }}>
           <h3 className="headline mt-1.5 text-[1.05rem] text-foreground transition-colors group-hover:text-brand">
             {article.title}
