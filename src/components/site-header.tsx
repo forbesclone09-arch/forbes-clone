@@ -151,7 +151,7 @@ export function SiteHeader() {
       </div>
       </div>
 
-      {!menuOpen && !isDashboard && <div className="border-t border-rule bg-paper">
+      {!menuOpen && !isDashboard && <div className="hidden border-t border-rule bg-paper sm:block">
         <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-1.5 px-5 py-2.5 sm:flex-row sm:gap-12 sm:px-8">
           {briefingItems.map((item) => (
             <Link
